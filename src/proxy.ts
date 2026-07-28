@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 
 const publicPaths = ["/login", "/register", "/api/auth/login", "/api/auth/register"]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get("session_token")?.value
   const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p))
   const isApi = request.nextUrl.pathname.startsWith("/api")

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -14,15 +13,40 @@ interface AuthFormProps {
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setIsLoading(true)
-    // TODO: implement auth
-    setTimeout(() => {
-      setIsLoading(false)
+    setError("")
+
+    const form = new FormData(e.currentTarget)
+    const email = form.get("email") as string
+    const password = form.get("password") as string
+    const username = form.get("username") as string
+
+    try {
+      const url = mode === "login" ? "/api/auth/login" : "/api/auth/register"
+      const body = mode === "login" ? { email, password } : { email, username, password }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Something went wrong")
+      }
+
       router.push("/")
-    }, 1000)
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -47,38 +71,26 @@ export function AuthForm({ mode }: AuthFormProps) {
               <label htmlFor="username" className="mb-1.5 block text-sm font-medium">
                 Username
               </label>
-              <Input
-                id="username"
-                placeholder="johndoe"
-                required
-                disabled={isLoading}
-              />
+              <Input id="username" name="username" placeholder="johndoe" required disabled={isLoading} />
             </div>
           )}
           <div>
             <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
               Email
             </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="hello@example.com"
-              required
-              disabled={isLoading}
-            />
+            <Input id="email" name="email" type="email" placeholder="hello@example.com" required disabled={isLoading} />
           </div>
           <div>
             <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
               Password
             </label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              required
-              disabled={isLoading}
-            />
+            <Input id="password" name="password" type="password" placeholder="••••••••" required disabled={isLoading} />
           </div>
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -97,22 +109,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           {mode === "login" ? (
             <>
               Don&apos;t have an account?{" "}
-              <a
-                href="/register"
-                className="font-medium text-primary hover:underline"
-              >
-                Sign up
-              </a>
+              <a href="/register" className="font-medium text-primary hover:underline">Sign up</a>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <a
-                href="/login"
-                className="font-medium text-primary hover:underline"
-              >
-                Sign in
-              </a>
+              <a href="/login" className="font-medium text-primary hover:underline">Sign in</a>
             </>
           )}
         </div>
