@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Smile, Paperclip, Send } from "lucide-react"
+import { Send, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoiceRecorder } from "@/components/voice/voice-recorder"
 import { VideoCircle } from "@/components/video/video-circle"
+import { EmojiPicker } from "@/components/emoji/emoji-picker"
+import { GiphyPicker } from "@/components/giphy/giphy-picker"
+import { StickerPicker } from "@/components/sticker/sticker-picker"
 
 export function MessageInput() {
   const [message, setMessage] = useState("")
@@ -23,15 +26,25 @@ export function MessageInput() {
     }
   }
 
+  function handleEmojiSelect(emoji: string) {
+    setMessage((m) => m + emoji)
+    inputRef.current?.focus()
+  }
+
+  function handleGifSelect(url: string) {
+    console.log("GIF selected:", url)
+  }
+
+  function handleStickerSelect(sticker: string) {
+    setMessage((m) => m + sticker)
+  }
+
   return (
     <div className="border-t border-border p-3">
       <div className="flex items-center gap-2 rounded-2xl border bg-card px-4 py-2 shadow-sm">
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <Smile className="h-4 w-4 text-muted-foreground" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <Paperclip className="h-4 w-4 text-muted-foreground" />
-        </Button>
+        <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+        <GiphyPicker onGifSelect={handleGifSelect} />
+        <StickerPicker onStickerSelect={handleStickerSelect} />
         <input
           ref={inputRef}
           value={message}
