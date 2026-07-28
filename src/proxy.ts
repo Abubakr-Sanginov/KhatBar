@@ -1,18 +1,27 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const publicPaths = ["/login", "/register", "/api/auth/login", "/api/auth/register"]
+const publicPaths = ["/login", "/register"]
 
 export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  if (pathname.startsWith("/_next") || pathname === "/favicon.ico") {
+    return NextResponse.next()
+  }
+
+  const isPublic = publicPaths.some((p) => pathname.startsWith(p))
+  if (isPublic) return NextResponse.next()
+
+  if (pathname.startsWith("/api")) return NextResponse.next()
+
   const token = request.cookies.get("session_token")?.value
-  const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p))
-  const isApi = request.nextUrl.pathname.startsWith("/api")
+  if (!token) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    url.search = ""
+    return NextResponse.redirect(url)
+  }
 
-  if (isPublic || isApi) return NextResponse.next()
-  if (!token) return NextResponse.redirect(new URL("/login", request.url))
   return NextResponse.next()
-}
-
-export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
