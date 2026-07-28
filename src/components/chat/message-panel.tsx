@@ -1,19 +1,21 @@
 "use client"
 
-import { useRef, useCallback, useState } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import { motion, AnimatePresence } from "framer-motion"
 import { MoreHorizontal, Phone, Video, Search as SearchIcon } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Button } from "@/components/ui/button"
 import { MessageInput } from "@/components/chat/message-input"
+import { VoiceRoom } from "@/components/room/voice-room"
 import { useChatStore } from "@/stores"
+import { cn } from "@/lib/utils"
 
 const MOCK_MESSAGES = [
   { id: "1", content: "Hey! How are you?", sender: "them", time: "10:30 AM" },
   { id: "2", content: "I'm doing great! Just finished the new design system.", sender: "me", time: "10:31 AM" },
   { id: "3", content: "That sounds amazing! Can I see it?", sender: "them", time: "10:32 AM" },
-  { id: "4", content: "Sure! I'll send it over. It's based on the new design tokens we discussed.", sender: "me", time: "10:33 AM" },
+  { id: "4", content: "Sure! I'll send it over.", sender: "me", time: "10:33 AM" },
   { id: "5", content: "Perfect, I've been looking forward to this!", sender: "them", time: "10:34 AM" },
 ]
 
@@ -21,6 +23,7 @@ export function MessagePanel() {
   const { activeChat } = useChatStore()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [messages] = useState(MOCK_MESSAGES)
+  const [isVoiceRoomOpen, setIsVoiceRoomOpen] = useState(false)
 
   if (!activeChat) {
     return (
@@ -39,7 +42,7 @@ export function MessagePanel() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-background">
+    <main className="flex flex-1 flex-col bg-background relative">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
           <UserAvatar
@@ -52,7 +55,9 @@ export function MessagePanel() {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon"><Phone className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsVoiceRoomOpen((v) => !v)}>
+            <Phone className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon"><Video className="h-4 w-4" /></Button>
           <Button variant="ghost" size="icon"><SearchIcon className="h-4 w-4" /></Button>
           <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -75,10 +80,7 @@ export function MessagePanel() {
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.2, delay: index * 0.02 }}
-                  className={cn(
-                    "flex px-4 py-1",
-                    isMine ? "justify-end" : "justify-start",
-                  )}
+                  className={cn("flex px-4 py-1", isMine ? "justify-end" : "justify-start")}
                 >
                   <div
                     className={cn(
@@ -105,10 +107,12 @@ export function MessagePanel() {
       </div>
 
       <MessageInput />
+
+      <AnimatePresence>
+        {isVoiceRoomOpen && (
+          <VoiceRoom roomId={activeChat.id} onLeave={() => setIsVoiceRoomOpen(false)} />
+        )}
+      </AnimatePresence>
     </main>
   )
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ")
 }

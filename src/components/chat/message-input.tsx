@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Smile, Paperclip, Mic, Send } from "lucide-react"
+import { Smile, Paperclip, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { VoiceRecorder } from "@/components/voice/voice-recorder"
+import { VideoCircle } from "@/components/video/video-circle"
 
 export function MessageInput() {
   const [message, setMessage] = useState("")
@@ -38,15 +40,15 @@ export function MessageInput() {
           placeholder="Message..."
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
-        {message.trim() ? (
-          <Button size="icon" className="h-8 w-8 shrink-0 rounded-xl" onClick={handleSend}>
-            <Send className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <Mic className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          <VoiceRecorder />
+          <VideoCircle />
+          {message.trim() ? (
+            <Button size="icon" className="h-8 w-8 shrink-0 rounded-xl" onClick={handleSend}>
+              <Send className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   )
