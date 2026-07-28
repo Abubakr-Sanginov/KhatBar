@@ -1,9 +1,9 @@
 import { createServer } from "http"
 import { Server } from "socket.io"
 import { PrismaClient } from "@prisma/client"
-import { PrismaPg } from "@prisma/adapter-pg"
+import { PrismaNeon } from "@prisma/adapter-neon"
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
 
 let io: Server | null = null
