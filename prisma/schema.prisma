@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PresenceStatus {
+  ONLINE
+  AWAY
+  DND
+  OFFLINE
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  CHANNEL
+  BLUETOOTH
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  FILE
+  AUDIO
+  VIDEO_NOTE
+  GIF
+  STICKER
+  CALL
+  SYSTEM
+  BLUETOOTH_HANDSHAKE
+}
+
+enum RoomKind {
+  VOICE
+  VIDEO
+  SCREEN
+}
+
+enum EncryptionMode {
+  NONE
+  SERVER_SIDE
+  DEVICE_ENVELOPE
+}
+
+enum AdminEventType {
+  USER_SUSPENDED
+  USER_RESTORED
+  ROLE_CHANGED
+  MESSAGE_PURGED
+  CHANNEL_LOCKED
+  KEY_ROTATED
+}
+
+model User {
+  id             String               @id @default(cuid())
+  username       String               @unique
+  email          String               @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  displayName    String
+  bio            String?              @db.VarChar(280)
+  avatarUrl      String?
+  avatarBlurhash String?
+  status         PresenceStatus       @default(OFFLINE)
+  statusText     String?              @db.VarChar(64)
+  lastSeenAt     DateTime?
+  isAdmin        Boolean              @default(false)
+  isSuspended    Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  deletedAt      DateTime?
+
+  memberships    ConversationMember[]
+  messages       Message[]            @relation("MessageAuthor")
+  reactions      Reaction[]
+  invitesCreated Invite[]             @relation("InviteCreator")
+  invitesUsed    InviteUse[]
+  voiceSessions  VoiceParticipant[]
+  devices        Device[]
+  blocksMade     Block[]              @relation("Blocker")
+  blocksGot      Block[]              @relation("Blocked")
+  adminEvents    AdminAuditLog[]      @relation("AdminActor")
+
+  @@index([lastSeenAt])
+  @@index([displayName])
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushToken    String   @unique
+  platform     String
+  lastActiveAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Conversation {
+  id                 String               @id @default(cuid())
+  type               ConversationType
+  name               String?
+  slug               String?              @unique
+  description        String?              @db.VarChar(500)
+  imageUrl           String?
+  isPublic           Boolean              @default(false)
+  isLocked           Boolean              @default(false)
+  directKey          String?              @unique
+  bluetoothTopic     String?              @unique
+  membersCount       Int                  @default(0)
+  lastMessageId      BigInt?
+  lastMessageAt      DateTime?
+  lastMessagePreview String?              @db.VarChar(160)
+  encryptionMode     EncryptionMode       @default(SERVER_SIDE)
+  activeKeyVersion   Int                  @default(1)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  deletedAt          DateTime?
+
+  members            ConversationMember[]
+  messages           Message[]
+  invites            Invite[]
+  rooms              VoiceRoom[]
+  encryptionKeys     ConversationKey[]
+  adminAuditLogs     AdminAuditLog[]
+
+  @@index([type, lastMessageAt(sort: Desc)])
+  @@index([isPublic, lastMessageAt(sort: Desc)])
+}
+
+model ConversationMember {
+  id                String        @id @default(cuid())
+  conversationId    String
+  userId            String
+  role              MemberRole    @default(MEMBER)
+  nickname          String?
+  lastReadMessageId BigInt?
+  lastReadAt        DateTime?
+  unreadCount       Int           @default(0)
+  mentionCount      Int           @default(0)
+  isMuted           Boolean       @default(false)
+  mutedUntil        DateTime?
+  isPinned          Boolean       @default(false)
+  joinedAt          DateTime      @default(now())
+  leftAt            DateTime?
+
+  conversation      Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId, isPinned, leftAt])
+  @@index([conversationId, role])
+}
+
+model Message {
+  id               BigInt          @id @default(autoincrement())
+  conversationId   String
+  authorId         String?
+  type             MessageType     @default(TEXT)
+  body             String?         @db.Text
+  replyToId        BigInt?
+  giphyId          String?
+  stickerId        String?
+  reactionsCount   Int             @default(0)
+  attachmentsCount Int             @default(0)
+  clientNonce      String?
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  ciphertext       Bytes?
+  iv               Bytes?
+  authTag          Bytes?
+  encryptionMode   EncryptionMode  @default(NONE)
+  keyVersion       Int?
+  createdAt        DateTime        @default(now())
+
+  conversation     Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author           User?           @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  replyTo          Message?        @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies          Message[]       @relation("MessageReply")
+  sticker          Sticker?        @relation(fields: [stickerId], references: [id], onDelete: SetNull)
+  attachments      Attachment[]
+  reactions        Reaction[]
+  mentions         Mention[]
+
+  @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([conversationId, type, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([replyToId])
+  @@unique([conversationId, clientNonce])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId BigInt
+  url       String
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  duration  Int?
+  waveform  Bytes?
+  blurhash  String?
+  thumbUrl  String?
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Mention {
+  messageId BigInt
+  userId    String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
+}
+
+model Reaction {
+  messageId BigInt
+  userId    String
+  emoji     String   @db.VarChar(32)
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId, emoji])
+  @@index([messageId, emoji])
+}
+
+model StickerPack {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  coverUrl String?
+  stickers Sticker[]
+}
+
+model Sticker {
+  id         String      @id @default(cuid())
+  packId     String
+  url        String
+  emoji      String?
+  isAnimated Boolean     @default(false)
+  pack       StickerPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+  messages   Message[]
+
+  @@index([packId])
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  conversationId String
+  creatorId      String
+  maxUses        Int?
+  uses           Int          @default(0)
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("InviteCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  usedBy         InviteUse[]
+
+  @@index([conversationId, revokedAt])
+}
+
+model InviteUse {
+  inviteId String
+  userId   String
+  usedAt   DateTime @default(now())
+  invite   Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([inviteId, userId])
+}
+
+model VoiceRoom {
+  id              String             @id @default(cuid())
+  conversationId  String
+  kind            RoomKind           @default(VOICE)
+  title           String?
+  isActive        Boolean            @default(true)
+  maxParticipants Int                @default(50)
+  startedAt       DateTime           @default(now())
+  endedAt         DateTime?
+
+  conversation    Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  participants    VoiceParticipant[]
+
+  @@index([conversationId, isActive])
+}
+
+model VoiceParticipant {
+  id              String    @id @default(cuid())
+  roomId          String
+  userId          String
+  joinedAt        DateTime  @default(now())
+  leftAt          DateTime?
+  isMuted         Boolean   @default(false)
+  isVideoOn       Boolean   @default(false)
+  isSharingScreen Boolean   @default(false)
+
+  room            VoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId, joinedAt])
+  @@index([roomId, leftAt])
+  @@index([userId, leftAt])
+}
+
+model ConversationKey {
+  id              String       @id @default(cuid())
+  conversationId  String
+  version         Int
+  wrappedKey      Bytes
+  algorithm       String       @default("aes-256-gcm")
+  createdAt       DateTime     @default(now())
+  rotatedByUserId String?
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, version])
+}
+
+model AdminAuditLog {
+  id             String         @id @default(cuid())
+  actorUserId    String
+  conversationId String?
+  eventType      AdminEventType
+  targetUserId   String?
+  payloadJson    String         @db.Text
+  createdAt      DateTime       @default(now())
+
+  actor          User           @relation("AdminActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  conversation   Conversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([conversationId, createdAt(sort: Desc)])
+}
