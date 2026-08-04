@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getIO } from "@/server/socket"
 
 async function authUser(req: NextRequest) {
   const token = req.headers.get("cookie")?.match(/session_token=([^;]+)/)?.[1]
@@ -56,6 +57,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     return NextResponse.json({ error: "Unknown fields" }, { status: 400 })
+  } catch {
+    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+  }
+}
+
+/**
+ * Delete a chat.
+ * - PRIVATE: any member hard-deletes it (both sides lose the thread).
+ * - GROUP / CHANNEL: the OWNER hard-deletes it; everyone else only leaves.
+ * Members are notified over the socket so the thread disappears live.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const userId = await authUser(req)
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { id } = await params
+
+    const membership = await prisma.chatMember.findUnique({
+      where: { userId_chatId: { userId, chatId: id } },
+      select: { role: true, chat: { select: { type: true } } },
+    })
+    if (!membership) return NextResponse.json({ error: "Not a member" }, { status: 404 })
+
+    if (membership.chat.type === "PRIVATE" || membership.role === "OWNER") {
+      await prisma.chat.delete({ where: { id } })
+      getIO()?.to(`chat:${id}`).emit("chat:deleted", { chatId: id, hard: true })
+      return NextResponse.json({ success: true, hard: true })
+    }
+
+    // Non-owner in a group/channel: leave instead of deleting the whole chat.
+    await prisma.chatMember.delete({ where: { userId_chatId: { userId, chatId: id } } })
+    getIO()?.to(`chat:${id}`).emit("chat:deleted", { chatId: id, hard: false })
+    return NextResponse.json({ success: true, hard: false })
   } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }

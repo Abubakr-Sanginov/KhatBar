@@ -1,6 +1,6 @@
 import type { Chat, User } from "@/types"
 
-export function formatMessageTime(iso: string): string {
+export function formatMessageTime(iso: string | number): string {
   const date = new Date(iso)
   const now = new Date()
   const diff = now.getTime() - date.getTime()

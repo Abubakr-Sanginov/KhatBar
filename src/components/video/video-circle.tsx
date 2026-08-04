@@ -20,7 +20,7 @@ export function VideoCircle({ onSendVideo }: VideoCircleProps) {
   const streamRef = useRef<MediaStream | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const sendRecording = useCallback(async () => {
     if (!recordedBlob) return

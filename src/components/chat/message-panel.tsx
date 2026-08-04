@@ -191,7 +191,7 @@ export function MessagePanel() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const lastSelectedIndexRef = useRef<number | null>(null)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const typingTimer = useRef<NodeJS.Timeout | null>(null)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const chatId = activeChat?.id
 

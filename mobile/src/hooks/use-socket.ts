@@ -11,7 +11,6 @@ export function useSocket() {
   const addMessage = useMessageStore((s) => s.addMessage);
   const updateChatInList = useChatStore((s) => s.updateChatInList);
   const connectedRef = useRef(false);
-
   useEffect(() => {
     if (!user || connectedRef.current) return;
 
@@ -40,6 +39,11 @@ export function useSocket() {
 
       socket.on("chat:updated", (chat: any) => {
         updateChatInList(chat.id, chat);
+      });
+
+      socket.on("chat:deleted", (data: { chatId: string; hard: boolean }) => {
+        void useChatStore.getState().deleteChat(data.chatId).catch(() => {});
+        useMessageStore.getState().clearChat(data.chatId);
       });
 
       socket.on("typing", (data: { chatId: string; userId: string; isTyping: boolean }) => {

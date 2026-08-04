@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useMessageStore } from "../../stores/message-store";
 import { useChatStore } from "../../stores/chat-store";
@@ -18,8 +19,7 @@ import { Colors } from "../../theme/colors";
 import { formatMessageTime, displayName } from "../../lib/utils";
 import type { Message } from "../../types";
 
-function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {
-  if (message.type === "SYSTEM") {
+function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {  if (message.type === "SYSTEM") {
     return (
       <View style={styles.systemMessage}>
         <Text style={styles.systemText}>{message.content}</Text>
@@ -71,9 +71,36 @@ export default function ChatScreen({ route, navigation }: any) {
   const isLoading = isLoadingByChat[chatId];
   const hasMore = hasMoreByChat[chatId];
   const { joinChat, leaveChat, sendMessage, markRead, sendTyping } = useSocket();
+  const deleteChat = useChatStore((s) => s.deleteChat);
   const [input, setInput] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert("Delete chat", "Delete this conversation?", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: () => {
+                  void deleteChat(chatId)
+                    .then(() => navigation.goBack())
+                    .catch((err: any) => Alert.alert("Error", err.message || "Could not delete chat"));
+                },
+              },
+            ]);
+          }}
+          style={{ paddingHorizontal: 16, paddingVertical: 4 }}
+        >
+          <Text style={{ color: Colors.dark.destructive, fontSize: 16 }}>Delete</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, chatId, deleteChat]);
 
   useEffect(() => {
     loadMessages(chatId);

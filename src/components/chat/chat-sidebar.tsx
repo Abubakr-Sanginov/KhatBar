@@ -14,6 +14,8 @@ import {
   Megaphone,
   Loader2,
   Globe,
+  Trash2,
+  Radio,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
@@ -35,8 +37,13 @@ import { PrivacyDialog } from "@/components/settings/privacy-dialog"
 import { cn } from "@/lib/utils"
 import { useChatStore, useUIStore } from "@/stores"
 import { useAuth } from "@/hooks/use-auth"
+import { useSocket } from "@/hooks/use-socket"
 import { formatMessageTime, getChatDisplayName, getChatUsername } from "@/lib/chat-utils"
 import { decryptPrivateChatMessages } from "@/lib/e2ee"
+import { useLocalChatStore } from "@/stores/local-chat-store"
+import { useLocalChat } from "@/hooks/use-local-chat"
+import { deleteLocalChat } from "@/lib/local-chat/db"
+import { LocalPairDialog } from "@/components/chat/local-pair-dialog"
 import type { ChatType } from "@/types"
 
 interface PublicChatResult {
@@ -61,8 +68,14 @@ export function ChatSidebar() {
     results: [],
   })
   const [joiningId, setJoiningId] = useState<string | null>(null)
+  const [isLocalPairOpen, setIsLocalPairOpen] = useState(false)
   const publicRequestRef = useRef(0)
-  const { chats, activeChat, setActiveChat, setChats, resetUnread, unreadCounts } = useChatStore()
+  const { chats, activeChat, setActiveChat, setChats, resetUnread, unreadCounts, removeChat } = useChatStore()
+  const localChats = useLocalChatStore((s) => s.chats)
+  const localMessages = useLocalChatStore((s) => s.messages)
+  const localPeers = useLocalChatStore((s) => s.peers)
+  const setLocalActiveChatId = useLocalChatStore((s) => s.setActiveChatId)
+  useLocalChat()
   const { user, isAdmin, logout } = useAuth()
   const userId = user?.id
   const { isMobileSidebarOpen, toggleSidebar } = useUIStore()
@@ -107,6 +120,16 @@ export function ChatSidebar() {
     }, 250)
     return () => clearTimeout(timer)
   }, [search])
+
+  // A chat was deleted on another device (or by the owner): drop it live.
+  const { on } = useSocket()
+  useEffect(() => {
+    const offDeleted = on("chat:deleted", (data) => {
+      const d = data as { chatId: string; hard: boolean }
+      removeChat(d.chatId)
+    })
+    return offDeleted
+  }, [on, removeChat])
 
   function openChat(chatId: string) {
     const chat = chats.find((c) => c.id === chatId)
@@ -249,6 +272,71 @@ export function ChatSidebar() {
 
         <ScrollArea className="flex-1 px-2">
           <div className="space-y-0.5 pb-2">
+            {localChats.length > 0 && (
+              <>
+                <div className="flex items-center justify-between px-3 pb-1 pt-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
+                    <Radio className="h-3.5 w-3.5" /> Local
+                  </p>
+                  <button
+                    onClick={() => setIsLocalPairOpen(true)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    + Pair
+                  </button>
+                </div>
+                {localChats.map((chat) => {
+                  const peer = localPeers[chat.peerId]
+                  const last = (localMessages[chat.id] ?? []).slice(-1)[0]
+                  return (
+                    <div
+                      key={chat.id}
+                      className="group relative flex items-center rounded-xl"
+                    >
+                      <button
+                        onClick={() => {
+                          setLocalActiveChatId(chat.id)
+                          if (isMobileSidebarOpen) toggleSidebar()
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-accent"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Radio className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium">{chat.peerName}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {last ? formatMessageTime(last.createdAt) : ""}
+                            </span>
+                          </div>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {last
+                              ? `${last.fromMe ? "You: " : ""}${last.content}`
+                              : peer?.online
+                                ? "online"
+                                : "offline"}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete local chat with ${chat.peerName}?`)) {
+                            setLocalActiveChatId(null)
+                            void deleteLocalChat(chat.id)
+                          }
+                        }}
+                        className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-0 shadow ring-1 ring-border transition-opacity hover:text-destructive group-hover:opacity-100"
+                        title="Delete local chat"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+
             {filtered.length === 0 && discoverable.length === 0 && !searchingPublic && (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                 {chats.length === 0 ? "No chats yet. Start a new chat by username." : "No matching chats"}
@@ -259,46 +347,73 @@ export function ChatSidebar() {
               const username = getChatUsername(chat, user?.id)
               const lastMessage = chat.lastMessage ?? chat.messages?.[0] ?? null
               const other = chat.members.find((m) => m.user.id !== user?.id)?.user ?? chat.members[0]?.user
+              const isOwner = chat.members.find((m) => m.user.id === user?.id)?.role === "OWNER"
               return (
-                <button
+                <div
                   key={chat.id}
-                  onClick={() => openChat(chat.id)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-accent",
+                    "group relative flex items-center rounded-xl",
                     activeChat?.id === chat.id && "bg-accent",
                   )}
                 >
-                  <ChatAvatar
-                    type={chat.type}
-                    name={name}
-                    avatarUrl={chat.avatarUrl}
-                    otherUser={other}
-                    size="md"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        {chat.type === "CHANNEL" && <Megaphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                        {chat.type === "GROUP" && <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                        <span className="truncate text-sm font-medium">{name}</span>
-                      </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {lastMessage ? formatMessageTime(lastMessage.createdAt) : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="truncate text-xs text-muted-foreground">
-                        {username ? `@${username}` : ""}
-                        {lastMessage?.content ? ` — ${lastMessage.content}` : ""}
-                      </span>
-                      {(unreadCounts[chat.id] ?? chat.unreadCount ?? 0) > 0 && (
-                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-medium text-primary-foreground">
-                          {unreadCounts[chat.id] ?? chat.unreadCount}
+                  <button
+                    onClick={() => openChat(chat.id)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-accent"
+                  >
+                    <ChatAvatar
+                      type={chat.type}
+                      name={name}
+                      avatarUrl={chat.avatarUrl}
+                      otherUser={other}
+                      size="md"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {chat.type === "CHANNEL" && <Megaphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                          {chat.type === "GROUP" && <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                          <span className="truncate text-sm font-medium">{name}</span>
                         </span>
-                      )}
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {lastMessage ? formatMessageTime(lastMessage.createdAt) : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="truncate text-xs text-muted-foreground">
+                          {username ? `@${username}` : ""}
+                          {lastMessage?.content ? ` — ${lastMessage.content}` : ""}
+                        </span>
+                        {(unreadCounts[chat.id] ?? chat.unreadCount ?? 0) > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-medium text-primary-foreground">
+                            {unreadCounts[chat.id] ?? chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const hint =
+                        chat.type === "PRIVATE"
+                          ? "This deletes the whole conversation for both sides."
+                          : isOwner
+                            ? "You own this chat. Deleting removes it for everyone."
+                            : "You are not the owner — this only removes the chat from your list."
+                      if (window.confirm(`Delete "${name}"?\n\n${hint}`)) {
+                        fetch(`/api/chats/${chat.id}`, { method: "DELETE" })
+                          .then((r) => r.json())
+                          .then((data) => {
+                            if (data.success) removeChat(chat.id)
+                          })
+                          .catch(() => {})
+                      }
+                    }}
+                    className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded-lg bg-background/90 p-1.5 text-muted-foreground opacity-0 shadow ring-1 ring-border transition-opacity hover:text-destructive group-hover:opacity-100"
+                    title="Delete chat"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )
             })}
 
@@ -363,6 +478,7 @@ export function ChatSidebar() {
       <NewGroupDialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen} />
       <NewChannelDialog open={isNewChannelOpen} onOpenChange={setIsNewChannelOpen} />
       <PrivacyDialog key={isPrivacyOpen ? "open" : "closed"} open={isPrivacyOpen} onOpenChange={setIsPrivacyOpen} />
+      <LocalPairDialog open={isLocalPairOpen} onOpenChange={setIsLocalPairOpen} />
     </>
   )
 }

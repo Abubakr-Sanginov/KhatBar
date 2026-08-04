@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const form = await req.formData()
+    const form = (await req.formData()) as unknown as { get(name: string): File | null }
     const file = form.get("file")
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })

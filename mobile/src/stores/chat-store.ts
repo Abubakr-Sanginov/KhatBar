@@ -20,6 +20,7 @@ interface ChatState {
   loadChat: (chatId: string) => Promise<void>;
   createChat: (data: CreateChatInput) => Promise<Chat>;
   leaveChat: (chatId: string) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
   markRead: (chatId: string) => Promise<void>;
   updateChatInList: (chatId: string, data: Partial<ChatListItem>) => void;
   addMessageToChat: (chatId: string, message: Message) => void;
@@ -71,6 +72,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   leaveChat: async (chatId) => {
     await chatsApi.leave(chatId);
+    set((s) => ({
+      chats: s.chats.filter((c) => c.id !== chatId),
+      activeChat: null,
+    }));
+  },
+
+  deleteChat: async (chatId) => {
+    await chatsApi.delete(chatId);
     set((s) => ({
       chats: s.chats.filter((c) => c.id !== chatId),
       activeChat: null,

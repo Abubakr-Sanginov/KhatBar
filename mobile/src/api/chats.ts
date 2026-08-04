@@ -33,6 +33,8 @@ export const chatsApi = {
 
   leave: (id: string) => api.post(`/api/chats/${id}/leave`),
 
+  delete: (id: string) => api.delete(`/api/chats/${id}`),
+
   join: (code: string) => api.post<{ chat: Chat }>(`/api/chats/join`, { code }),
 
   search: (query: string) =>

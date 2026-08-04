@@ -27,6 +27,7 @@ Real-time chat, voice & video calls, screen sharing, private/public groups, chan
 - Replies, editing, pinning, deletion, read receipts, typing indicators
 - Message search, unread badges, last-seen & online presence
 - **End-to-end encryption** (ECDH P-256 + AES-256-GCM + HKDF) for private chats and closed groups — keys never leave the device
+- **Local chats** — device-to-device messaging with **zero server involvement** (see [Local chat](#-local-chat-offline-e2ee))
 
 ### 📞 Calls
 - Audio & video calls, group mesh calls
@@ -84,6 +85,7 @@ Real-time chat, voice & video calls, screen sharing, private/public groups, chan
 │   ├── components/         # UI (chat, calls, dialogs, pickers…)
 │   ├── hooks/              # useAuth, useCall, useSocket
 │   ├── lib/                # e2ee.ts, webrtc.ts, socket-client.ts, call-sounds…
+│   ├── lib/local-chat/     # offline E2EE: transport, crypto, sync, db
 │   ├── server/socket.ts    # Socket.IO server: messaging, presence, calls
 │   └── stores/             # Zustand stores
 ├── prisma/schema.prisma    # Database schema
@@ -161,6 +163,40 @@ Scan the QR code with **Expo Go** (Android) or the Camera app (iOS). The mobile 
 
 ---
 
+## 📡 Local chat (offline / E2EE)
+
+A fully offline, end-to-end-encrypted chat layer that **never touches the server**. It lives in `src/lib/local-chat/` and is built from three layers:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Transport   peer discovery + socket                    │
+│              · BroadcastChannel (tabs / same machine)   │
+│              · WebRTC DataChannel (Wi-Fi LAN, no STUN)  │
+│              · pairing via 8-char code + SDP exchange   │
+├─────────────────────────────────────────────────────────┤
+│  Crypto      identity: ECDH P-256 keypair per device    │
+│              keys exchanged at pairing                  │
+│              messages: AES-256-GCM (shared secret)      │
+├─────────────────────────────────────────────────────────┤
+│  Sync        delivery ledger (IndexedDB)                │
+│              pending → delivered (ack) → failed         │
+│              auto-resend when peer is back in range     │
+└─────────────────────────────────────────────────────────┘
+```
+
+- **Transport** (`transport.ts`) — `BroadcastChannel` discovers peers on the same machine instantly; WebRTC DataChannels connect devices on the same Wi-Fi network with **no STUN/TURN servers** (host candidates only). Cross-network pairing uses an 8-character code exchanged out-of-band.
+- **Crypto** (`crypto.ts`) — every device generates an ECDH P-256 identity keypair on first boot (stored in IndexedDB). At pairing time peers exchange public keys; all messages are then sealed with AES-256-GCM using the derived shared secret. Even if the LAN is sniffed, nothing is readable.
+- **Sync** (`sync.ts` + `db.ts`) — outgoing messages are written to an outbox as ciphertext *before* anything is sent. If the peer is unreachable they stay `pending` and are **re-sent automatically** when the device comes back in range; the peer answers with an `ack` and the ledger flips to `delivered`. History is stored decrypted only on the sender's device.
+
+### Using it
+
+1. Open KhatBar in two tabs (or two devices on the same Wi-Fi).
+2. In the sidebar press **Local → + Pair**.
+3. Pick the discovered device and press **Pair** (or exchange a pairing code for LAN).
+4. Messages flow directly between the devices — close the server and they still work.
+
+---
+
 ## 📞 Calls & E2EE in detail
 
 **Calls.** `call:invite` → `call:accept` → signaling (`call:signal` carries SDP + ICE) → mesh peer connections. Call lifecycle is persisted (`Call` model), a `CALL` message appears in chat history, missed/declined calls are recorded.
@@ -205,4 +241,8 @@ npx expo-doctor       # health check
 
 ## 📄 License
 
-Private project. All rights reserved.
+[MIT](./LICENSE) © 2026 KhatBar contributors
+
+---
+
+Made with TypeScript, Next.js, React Native, WebRTC and WebCrypto.

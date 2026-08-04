@@ -17,7 +17,7 @@ export function MessageInput() {
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const typingTimer = useRef<NodeJS.Timeout | null>(null)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { activeChat, addMessage } = useChatStore()
   const { isConnected, emit } = useSocket()
   const { user } = useAuth()

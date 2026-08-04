@@ -19,6 +19,7 @@ import {
   Check,
   Link as LinkIcon,
   LogOut,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -192,6 +193,22 @@ export function InfoPanel() {
       const listRes = await fetch("/api/chats")
       const listData = await listRes.json()
       if (listData.chats) useChatStore.getState().setChats(listData.chats)
+    } catch {}
+  }
+
+  async function deleteChat() {
+    if (!chatId) return
+    const hint =
+      activeChat?.type === "PRIVATE"
+        ? "This deletes the whole conversation for both sides."
+        : myRole === "OWNER"
+          ? "You own this chat. Deleting removes it for everyone."
+          : "You are not the owner — this only removes the chat from your list."
+    if (!confirm(`Delete this chat?\n\n${hint}`)) return
+    try {
+      const res = await fetch(`/api/chats/${chatId}`, { method: "DELETE" })
+      if (!res.ok) return
+      useChatStore.getState().removeChat(chatId)
     } catch {}
   }
 
@@ -517,6 +534,12 @@ export function InfoPanel() {
               <LogOut className="h-4 w-4" /> {isChannel ? "Leave channel" : "Leave group"}
             </button>
           )}
+          <button
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+            onClick={deleteChat}
+          >
+            <Trash2 className="h-4 w-4" /> Delete chat
+          </button>
         </div>
       </ScrollArea>
 

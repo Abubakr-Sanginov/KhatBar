@@ -16,6 +16,7 @@ interface ChatStore {
   updateMemberLastRead: (chatId: string, userId: string, lastReadAt: string) => void
   incrementUnread: (chatId: string) => void
   resetUnread: (chatId: string) => void
+  removeChat: (chatId: string) => void
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -101,6 +102,19 @@ export const useChatStore = create<ChatStore>((set) => ({
           : c,
       ),
     })),
+  removeChat: (chatId) =>
+    set((state) => {
+      const messages = { ...state.messages }
+      delete messages[chatId]
+      const unreadCounts = { ...state.unreadCounts }
+      delete unreadCounts[chatId]
+      return {
+        chats: state.chats.filter((c) => c.id !== chatId),
+        activeChat: state.activeChat?.id === chatId ? null : state.activeChat,
+        messages,
+        unreadCounts,
+      }
+    }),
 }))
 
 interface UserStore {
