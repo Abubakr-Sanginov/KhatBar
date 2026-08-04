@@ -41,7 +41,7 @@ export function UserAvatar({ user, size = "md", showStatus = true, className }: 
   return (
     <div className={cn("relative shrink-0", className)}>
       <Avatar className={cn("ring-2 ring-background", sizeMap[size])}>
-        <AvatarImage src={user.avatarUrl ?? undefined} alt={user.displayName ?? user.username} />
+        <AvatarImage src={user.avatarUrl ?? undefined} alt={user.displayName ?? user.username ?? undefined} />
         <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
           {initials}
         </AvatarFallback>

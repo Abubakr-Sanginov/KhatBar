@@ -23,7 +23,13 @@ export async function GET(req: Request) {
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
         status: user.status,
+        role: user.role,
+        lastSeen: user.lastSeen,
+        privacyShowStatus: user.privacyShowStatus,
+        privacyShowLastSeen: user.privacyShowLastSeen,
+        privacyReadReceipts: user.privacyReadReceipts,
       },
+      token,
     })
   } catch {
     return NextResponse.json({ user: null })

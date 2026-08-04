@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const publicPaths = ["/login", "/register"]
+const publicPaths = ["/login", "/register", "/join"]
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -20,6 +20,10 @@ export function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     url.search = ""
+    // Keep the original target so login can return the user to it.
+    if (pathname !== "/") {
+      url.searchParams.set("next", pathname + request.nextUrl.search)
+    }
     return NextResponse.redirect(url)
   }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,8 +12,14 @@ interface AuthFormProps {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  // Only same-origin relative paths, so `next` cannot bounce to another site.
+  const rawNext = searchParams.get("next")
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/"
+  const nextQuery = nextPath === "/" ? "" : `?next=${encodeURIComponent(nextPath)}`
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -21,9 +27,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     setError("")
 
     const form = new FormData(e.currentTarget)
-    const email = form.get("email") as string
-    const password = form.get("password") as string
-    const username = form.get("username") as string
+    const email = String(form.get("email") || "").trim()
+    const password = String(form.get("password") || "")
+    const username = String(form.get("username") || "").trim()
 
     try {
       const url = mode === "login" ? "/api/auth/login" : "/api/auth/register"
@@ -40,7 +46,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         throw new Error(data.error || "Something went wrong")
       }
 
-      router.push("/")
+      router.push(nextPath)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
@@ -69,9 +75,18 @@ export function AuthForm({ mode }: AuthFormProps) {
           {mode === "register" && (
             <div>
               <label htmlFor="username" className="mb-1.5 block text-sm font-medium">
-                Username
+                Username <span className="text-muted-foreground">(optional)</span>
               </label>
-              <Input id="username" name="username" placeholder="johndoe" required disabled={isLoading} />
+              <Input
+                id="username"
+                name="username"
+                placeholder="Abubakr"
+                autoCapitalize="none"
+                disabled={isLoading}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                You can add it later if you skip it.
+              </p>
             </div>
           )}
           <div>
@@ -109,12 +124,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           {mode === "login" ? (
             <>
               Don&apos;t have an account?{" "}
-              <a href="/register" className="font-medium text-primary hover:underline">Sign up</a>
+              <a href={`/register${nextQuery}`} className="font-medium text-primary hover:underline">Sign up</a>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <a href="/login" className="font-medium text-primary hover:underline">Sign in</a>
+              <a href={`/login${nextQuery}`} className="font-medium text-primary hover:underline">Sign in</a>
             </>
           )}
         </div>

@@ -31,7 +31,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +41,33 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Uploads
+public/uploads/
+
+# AI agent config / session files (never commit)
+.claude/
+.kimi/
+.agents/
+.ai/
+
+# local tooling
+bunfig.toml
+.yarnrc
+.yarnrc.yml
+.npmrc
+pnpm-lock.yaml
+yarn.lock
+
+# test artifacts
+socket-test.cjs
+
+# expo / react native (mobile/)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/*.tsbuildinfo
+mobile/android/
+mobile/ios/
+mobile/.env.local

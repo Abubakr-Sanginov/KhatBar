@@ -1,16 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Image as ImageIcon } from "lucide-react"
+import { Search, Image as ImageIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-const MOCK_GIFS = [
-  { id: "1", url: "https://media.tenor.com/abc123/giphy.gif", preview: "https://media.tenor.com/abc123/preview.gif" },
-  { id: "2", url: "https://media.tenor.com/def456/giphy.gif", preview: "https://media.tenor.com/def456/preview.gif" },
-  { id: "3", url: "https://media.tenor.com/ghi789/giphy.gif", preview: "https://media.tenor.com/ghi789/preview.gif" },
-]
+interface GifItem {
+  id: string
+  url: string
+  preview: string
+}
 
 interface GiphyPickerProps {
   onGifSelect: (url: string) => void
@@ -19,10 +19,51 @@ interface GiphyPickerProps {
 export function GiphyPicker({ onGifSelect }: GiphyPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [items, setItems] = useState<GifItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const requestRef = useRef(0)
+
+  function load(q: string) {
+    const id = ++requestRef.current
+    setLoading(true)
+    setError("")
+    const params = new URLSearchParams({ type: "gifs", offset: "0" })
+    if (q.trim()) {
+      params.set("q", q)
+    } else {
+      params.set("trending", "1")
+    }
+    fetch(`/api/giphy?${params}`)
+      .then((r) => r.json())
+      .then((data: { error?: string; items?: GifItem[] }) => {
+        if (id !== requestRef.current) return
+        if (data.error) {
+          setError(data.error)
+          setItems([])
+        } else {
+          setItems(data.items || [])
+        }
+      })
+      .catch(() => {
+        if (id === requestRef.current) {
+          setError("Failed to load GIFs")
+          setItems([])
+        }
+      })
+      .finally(() => {
+        if (id === requestRef.current) setLoading(false)
+      })
+  }
+
+  function handleOpen() {
+    if (!isOpen) load(query)
+    setIsOpen(!isOpen)
+  }
 
   return (
     <div className="relative">
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(!isOpen)}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleOpen}>
         <ImageIcon className="h-4 w-4 text-muted-foreground" />
       </Button>
       <AnimatePresence>
@@ -40,20 +81,33 @@ export function GiphyPicker({ onGifSelect }: GiphyPickerProps) {
                 <Input
                   placeholder="Search GIFs..."
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setQuery(v)
+                    if (v.trim()) load(v)
+                  }}
                   className="pl-9"
                 />
               </div>
+              {error && <p className="mb-2 text-xs text-destructive">{error}</p>}
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                {MOCK_GIFS.map((gif) => (
+                {loading && items.length === 0 && (
+                  <div className="col-span-2 flex justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {!loading && items.length === 0 && !error && (
+                  <p className="col-span-2 py-8 text-center text-xs text-muted-foreground">
+                    No GIFs found
+                  </p>
+                )}
+                {items.map((gif) => (
                   <button
                     key={gif.id}
                     onClick={() => { onGifSelect(gif.url); setIsOpen(false) }}
                     className="aspect-video rounded-xl overflow-hidden bg-muted hover:ring-2 ring-primary transition-all"
                   >
-                    <div className="h-full w-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      <span className="text-xs text-muted-foreground">GIF</span>
-                    </div>
+                    <img src={gif.preview} alt="" className="h-full w-full object-cover" loading="lazy" />
                   </button>
                 ))}
               </div>

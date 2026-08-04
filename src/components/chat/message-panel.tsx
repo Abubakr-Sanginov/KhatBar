@@ -1,29 +1,288 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
-import { motion, AnimatePresence } from "framer-motion"
-import { MoreHorizontal, Phone, Video, Search as SearchIcon } from "lucide-react"
-import { UserAvatar } from "@/components/ui/user-avatar"
+import { motion } from "framer-motion"
+import {
+  MoreHorizontal,
+  Phone,
+  Video,
+  Search as SearchIcon,
+  Trash2,
+  FileText,
+  Pin,
+  PinOff,
+  Flag,
+  PanelRight,
+  X,
+  Check,
+  Loader2,
+} from "lucide-react"
+import { ChatAvatar } from "@/components/ui/chat-avatar"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { MessageInput } from "@/components/chat/message-input"
-import { VoiceRoom } from "@/components/room/voice-room"
-import { useChatStore } from "@/stores"
+import { CallMessage } from "@/components/chat/call-message"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { useChatStore, useUIStore } from "@/stores"
+import { useAuth } from "@/hooks/use-auth"
+import { useSocket } from "@/hooks/use-socket"
+import { useCall } from "@/hooks/use-call"
 import { cn } from "@/lib/utils"
+import { decryptPrivateChatMessages } from "@/lib/e2ee"
+import { getChatDisplayName, getChatUsername, formatMessageTime, canPostToChat } from "@/lib/chat-utils"
+import type { Message } from "@/types"
 
-const MOCK_MESSAGES = [
-  { id: "1", content: "Hey! How are you?", sender: "them", time: "10:30 AM" },
-  { id: "2", content: "I'm doing great! Just finished the new design system.", sender: "me", time: "10:31 AM" },
-  { id: "3", content: "That sounds amazing! Can I see it?", sender: "them", time: "10:32 AM" },
-  { id: "4", content: "Sure! I'll send it over.", sender: "me", time: "10:33 AM" },
-  { id: "5", content: "Perfect, I've been looking forward to this!", sender: "them", time: "10:34 AM" },
-]
+function MessageBubble({
+  msg,
+  isMine,
+  onDelete,
+  onTogglePin,
+  isRead,
+  isSelected,
+  selectionMode,
+  onStartSelection,
+  onExtendSelection,
+  onToggleSelection,
+}: {
+  msg: Message
+  isMine: boolean
+  onDelete: () => void
+  onTogglePin: () => void
+  isRead: boolean
+  isSelected: boolean
+  selectionMode: boolean
+  onStartSelection: () => void
+  onExtendSelection: () => void
+  onToggleSelection: () => void
+}) {
+  const senderUsername = msg.sender?.username
+  const [hovered, setHovered] = useState(false)
+  const isDeleted = msg.content === null && !msg.mediaUrl
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.2 }}
+      className={cn(
+        "flex px-4 py-1 group",
+        isMine ? "justify-end" : "justify-start",
+        selectionMode && "cursor-pointer",
+      )}
+      onMouseEnter={() => {
+        setHovered(true)
+        if (selectionMode) onExtendSelection()
+      }}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => selectionMode && onToggleSelection()}
+      onDoubleClick={onStartSelection}
+    >
+      <div
+        className={cn(
+          "relative max-w-[70%] rounded-2xl px-4 py-2 text-sm transition-shadow",
+          isMine
+            ? "bg-primary text-primary-foreground rounded-br-md"
+            : "bg-secondary text-secondary-foreground rounded-bl-md",
+          isSelected && "ring-2 ring-primary",
+        )}
+      >
+        {isSelected && (
+          <span
+            className={cn(
+              "absolute -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow",
+              isMine ? "-left-2" : "-right-2",
+            )}
+          >
+            <Check className="h-3 w-3" />
+          </span>
+        )}
+        {hovered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePin() }}
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 rounded-lg p-1.5 opacity-60 hover:bg-accent hover:opacity-100",
+              isMine ? "-left-9" : "-right-9",
+            )}
+            title={msg.isPinned ? "Unpin" : "Pin"}
+          >
+            {msg.isPinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground" />}
+          </button>
+        )}
+        {isMine && hovered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground opacity-60 hover:bg-accent hover:opacity-100",
+              isMine ? "-left-[4.5rem]" : "-right-[4.5rem]",
+            )}
+            title={isDeleted ? "Delete forever" : "Delete"}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+        {msg.isPinned && (
+          <Pin className="absolute -top-2 right-2 h-3 w-3 text-primary" />
+        )}
+        {!isMine && senderUsername && (
+          <p className="mb-0.5 text-xs font-medium text-primary">@{senderUsername}</p>
+        )}
+
+        {isDeleted ? (
+          <p className="italic opacity-60">Message deleted</p>
+        ) : msg.type === "TEXT" ? (
+          <p>{msg.content}</p>
+        ) : msg.type === "IMAGE" ? (
+          <img src={msg.mediaUrl!} alt="" className="max-h-80 rounded-xl" />
+        ) : msg.type === "GIF" ? (
+          <img src={msg.mediaUrl!} alt="" className="w-56 rounded-xl" loading="lazy" />
+        ) : msg.type === "STICKER" ? (
+          <img src={msg.mediaUrl!} alt="" className="w-36 rounded-xl" loading="lazy" />
+        ) : msg.type === "VIDEO" ? (
+          <video src={msg.mediaUrl!} controls className="max-h-80 rounded-xl" />
+        ) : msg.type === "AUDIO" ? (
+          <audio src={msg.mediaUrl!} controls className="w-64" />
+        ) : msg.type === "FILE" ? (
+          <a href={msg.mediaUrl!} target="_blank" rel="noreferrer" className="flex items-center gap-2 underline">
+            <FileText className="h-4 w-4" />
+            {msg.content || "File"}
+          </a>
+        ) : msg.type === "SYSTEM" ? (
+          <p className="text-xs italic opacity-70">{msg.content}</p>
+        ) : (
+          <p>{msg.content}</p>
+        )}
+
+        <p className={cn("mt-0.5 text-right text-[10px]", isMine ? "text-primary-foreground/60" : "text-muted-foreground")}>
+          {msg.content !== null || msg.mediaUrl ? formatMessageTime(msg.createdAt) : ""}
+          {isRead && <span className="ml-1 font-medium text-primary-foreground">✓ Read</span>}
+        </p>
+      </div>
+    </motion.div>
+  )
+}
 
 export function MessagePanel() {
-  const { activeChat } = useChatStore()
+  const { activeChat, chats, messages, setMessages, addMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
+  const { toggleInfoPanel } = useUIStore()
+  const { user } = useAuth()
+  const { isConnected, emit, on } = useSocket()
+  const { startCall: beginCall } = useCall()
+  const [isTyping, setIsTyping] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<Message[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSending, setReportSending] = useState(false)
+  const [reportSent, setReportSent] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const lastSelectedIndexRef = useRef<number | null>(null)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const [messages] = useState(MOCK_MESSAGES)
-  const [isVoiceRoomOpen, setIsVoiceRoomOpen] = useState(false)
+  const typingTimer = useRef<NodeJS.Timeout | null>(null)
+
+  const chatId = activeChat?.id
+
+  useEffect(() => {
+    if (!chatId) return
+    let cancelled = false
+    fetch(`/api/messages?chatId=${chatId}`)
+      .then((r) => r.json())
+      .then(async (data) => {
+        if (cancelled || !data.messages || !activeChat || !user?.id) return
+        const decrypted = await decryptPrivateChatMessages(activeChat, user.id, data.messages)
+        if (!cancelled) setMessages(chatId, decrypted)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [chatId, activeChat, setMessages, user?.id])
+
+  useEffect(() => {
+    if (!chatId) return
+    emit("join:chat", chatId)
+    return () => emit("leave:chat", chatId)
+  }, [chatId, isConnected, emit])
+
+  useEffect(() => {
+    const offNew = on("message:new", (data) => {
+      const msg = data as Message
+      const chat = chats.find((item) => item.id === msg.chatId)
+      void decryptPrivateChatMessages(chat ?? activeChat!, user?.id ?? "", [msg]).then(([decrypted]) => {
+        touchChat(msg.chatId, decrypted)
+        if (msg.chatId === chatId) addMessage(chatId!, decrypted)
+        else if (msg.senderId !== user?.id) incrementUnread(msg.chatId)
+      })
+    })
+    const offDeleted = on("message:deleted", (data) => {
+      const d = data as { chatId: string; messageId: string }
+      if (d.chatId === chatId) {
+        useChatStore.setState((state) => ({
+          messages: {
+            ...state.messages,
+            [d.chatId]: (state.messages[d.chatId] || []).map((m) =>
+              m.id === d.messageId ? { ...m, content: null, mediaUrl: null } : m,
+            ),
+          },
+        }))
+      }
+    })
+    const offDeletedHard = on("message:deleted-hard", (data) => {
+      const d = data as { chatId: string; messageId: string }
+      if (d.chatId === chatId) {
+        setSelectedIds((prev) => prev.filter((id) => id !== d.messageId))
+        useChatStore.setState((state) => ({
+          messages: {
+            ...state.messages,
+            [d.chatId]: (state.messages[d.chatId] || []).filter((m) => m.id !== d.messageId),
+          },
+        }))
+      }
+    })
+    const offTyping = on("typing", (data) => {
+      const d = data as { chatId: string; userId: string; isTyping: boolean }
+      if (d.chatId === chatId && d.userId !== user?.id) {
+        setIsTyping(d.isTyping)
+        if (typingTimer.current) clearTimeout(typingTimer.current)
+        if (d.isTyping) {
+          typingTimer.current = setTimeout(() => setIsTyping(false), 4000)
+        }
+      }
+    })
+    const offPresence = on("presence:update", (data) => {
+      const d = data as { userId: string; status: "ONLINE" | "OFFLINE" }
+      updateMemberStatus(d.userId, d.status)
+    })
+    const offRead = on("chat:read", (data) => {
+      const d = data as { chatId: string; userId: string; lastReadAt: string }
+      if (d.userId === user?.id) {
+        resetUnread(d.chatId)
+      } else {
+        updateMemberLastRead(d.chatId, d.userId, d.lastReadAt)
+      }
+    })
+    return () => {
+      offNew()
+      offDeleted()
+      offDeletedHard()
+      offTyping()
+      offPresence()
+      offRead()
+    }
+  }, [chatId, chats, activeChat, on, addMessage, touchChat, incrementUnread, setMessages, updateMemberStatus, updateMemberLastRead, resetUnread, user?.id])
 
   if (!activeChat) {
     return (
@@ -41,78 +300,355 @@ export function MessagePanel() {
     )
   }
 
+  const chatMessages = messages[activeChat.id] || []
+  const name = getChatDisplayName(activeChat, user?.id)
+  const username = getChatUsername(activeChat, user?.id)
+  const other = activeChat.members.find((m) => m.user.id !== user?.id)?.user ?? activeChat.members[0]?.user
+  const otherReadAt = activeChat.members.find((m) => m.user.id !== user?.id)?.lastReadAt
+  const showRead = Boolean(other?.privacyReadReceipts !== false && otherReadAt)
+  const isChannel = activeChat.type === "CHANNEL"
+  const isGroupChat = activeChat.type !== "PRIVATE"
+  const memberCount = activeChat.memberCount ?? activeChat.members.length
+  const canPost = canPostToChat(activeChat, user?.id)
+
+  function handleDelete(msgId: string) {
+    if (!activeChat) return
+    const msg = chatMessages.find((m) => m.id === msgId)
+    const hard = msg ? msg.content === null && !msg.mediaUrl : false
+    if (hard && !confirm("Delete this message permanently?")) return
+    emit("message:delete", { chatId: activeChat.id, messageId: msgId, hard })
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  function startSelection(index: number) {
+    const msg = chatMessages[index]
+    if (!msg) return
+    lastSelectedIndexRef.current = index
+    setSelectedIds([msg.id])
+  }
+
+  function extendSelection(index: number) {
+    const anchor = lastSelectedIndexRef.current
+    if (anchor === null) return
+    const from = Math.min(anchor, index)
+    const to = Math.max(anchor, index)
+    setSelectedIds(chatMessages.slice(from, to + 1).map((message) => message.id))
+  }
+
+  function clearSelection() {
+    setSelectedIds([])
+    lastSelectedIndexRef.current = null
+  }
+
+  function deleteSelected() {
+    if (!activeChat) return
+    for (const id of selectedIds) {
+      const msg = chatMessages.find((m) => m.id === id)
+      if (!msg || msg.senderId !== user?.id) continue
+      const hard = msg.content === null && !msg.mediaUrl
+      if (hard && !confirm("Delete this message permanently?")) continue
+      emit("message:delete", { chatId: activeChat.id, messageId: id, hard })
+    }
+    clearSelection()
+  }
+
+  function runSearch(query: string) {
+    setSearchQuery(query)
+    if (!query.trim()) {
+      setSearchResults(null)
+      return
+    }
+    setSearching(true)
+    fetch(`/api/messages?chatId=${activeChat?.id}&limit=200`)
+      .then((r) => r.json())
+      .then(async (data) => {
+        const msgs: Message[] = await decryptPrivateChatMessages(activeChat!, user?.id ?? "", data.messages || [])
+        setSearchResults(msgs.filter((m) => m.content?.toLowerCase().includes(query.toLowerCase())))
+      })
+      .catch(() => setSearchResults([]))
+      .finally(() => setSearching(false))
+  }
+
+  async function submitReport() {
+    if (!activeChat) return
+    setReportSending(true)
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: activeChat.id, reason: "Reported from chat header" }),
+      })
+      if (res.ok) setReportSent(true)
+    } catch {}
+    setReportSending(false)
+  }
+
+  function handleStartCall(mode: "voice" | "video") {
+    if (!activeChat) return
+    void beginCall({
+      chatId: activeChat.id,
+      mode,
+      isGroup: activeChat.type !== "PRIVATE",
+      chatName: name,
+      peers: activeChat.members
+        .filter((m) => m.user.id !== user?.id)
+        .map((m) => ({
+          id: m.user.id,
+          username: m.user.username,
+          displayName: m.user.displayName,
+          avatarUrl: m.user.avatarUrl,
+        })),
+    })
+  }
+
+  async function handleTogglePin(msg: Message) {
+    try {
+      const res = await fetch(`/api/messages/${msg.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPinned: !msg.isPinned }),
+      })
+      if (res.ok) {
+        useChatStore.setState((state) => ({
+          messages: {
+            ...state.messages,
+            [msg.chatId]: (state.messages[msg.chatId] || []).map((m) =>
+              m.id === msg.id ? { ...m, isPinned: !msg.isPinned } : m,
+            ),
+          },
+        }))
+      }
+    } catch {}
+  }
+
   return (
     <main className="flex flex-1 flex-col bg-background relative">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <UserAvatar
-            user={{ avatarUrl: null, displayName: activeChat.name!, username: activeChat.name!, status: "ONLINE" }}
+          <ChatAvatar
+            type={activeChat.type}
+            name={name}
+            avatarUrl={activeChat.avatarUrl}
+            otherUser={other}
             size="md"
           />
           <div>
-            <p className="text-sm font-medium">{activeChat.name}</p>
-            <p className="text-xs text-emerald-500">Online</p>
+            <p className="text-sm font-medium">{name}</p>
+            <p className="text-xs text-muted-foreground">
+              {isTyping ? (
+                <span className="text-primary">Typing...</span>
+              ) : isGroupChat ? (
+                <>
+                  {username ? `@${username} • ` : ""}
+                  {memberCount} {isChannel
+                    ? memberCount === 1 ? "subscriber" : "subscribers"
+                    : memberCount === 1 ? "member" : "members"}
+                </>
+              ) : username ? (
+                <>
+                  @{username}
+                  {other?.status === "ONLINE" && <span className="text-emerald-500"> • Online</span>}
+                </>
+              ) : (
+                other?.status === "ONLINE" && <span className="text-emerald-500">Online</span>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setIsVoiceRoomOpen((v) => !v)}>
-            <Phone className="h-4 w-4" />
+          {/* Channels are broadcast-only, so calling them makes no sense. */}
+          {!isChannel && (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => handleStartCall("voice")} aria-label="Start voice call">
+                <Phone className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleStartCall("video")} aria-label="Start video call">
+                <Video className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setSearchOpen(true); setSearchQuery(""); setSearchResults(null) }}
+          >
+            <SearchIcon className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon"><Video className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon"><SearchIcon className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => { setSearchOpen(true); setSearchQuery(""); setSearchResults(null) }}
+              >
+                <SearchIcon className="h-4 w-4" /> Search in conversation
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleInfoPanel}>
+                <PanelRight className="h-4 w-4" /> Conversation details
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => { setReportSent(false); setReportOpen(true) }}
+              >
+                <Flag className="h-4 w-4" /> Report
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <Virtuoso
-          ref={virtuosoRef}
-          className="h-full"
-          data={messages}
-          followOutput="smooth"
-          initialTopMostItemIndex={messages.length - 1}
-          itemContent={(index) => {
-            const msg = messages[index]
-            const isMine = msg.sender === "me"
-            return (
-              <AnimatePresence>
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.2, delay: index * 0.02 }}
-                  className={cn("flex px-4 py-1", isMine ? "justify-end" : "justify-start")}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[70%] rounded-2xl px-4 py-2 text-sm",
-                      isMine
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-secondary text-secondary-foreground rounded-bl-md",
-                    )}
-                  >
-                    <p>{msg.content}</p>
-                    <p className={cn("mt-0.5 text-right text-[10px]", isMine ? "text-primary-foreground/60" : "text-muted-foreground")}>
-                      {msg.time}
-                    </p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-            )
-          }}
-          components={{
-            Header: () => <div className="h-4" />,
-            Footer: () => <div className="h-4" />,
-          }}
-        />
+        {chatMessages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-muted-foreground">No messages yet. Say hi!</p>
+          </div>
+        ) : (
+          <Virtuoso
+            ref={virtuosoRef}
+            className="h-full"
+            data={chatMessages}
+            followOutput="smooth"
+            initialTopMostItemIndex={chatMessages.length - 1}
+            itemContent={(index) => {
+              const msg = chatMessages[index]
+              const isMine = msg.senderId === user?.id
+              if (msg.type === "CALL") {
+                return (
+                  <CallMessage
+                    msg={msg}
+                    isMine={isMine}
+                    onCallBack={isChannel ? undefined : (isVideo) => handleStartCall(isVideo ? "video" : "voice")}
+                    onDelete={() => handleDelete(msg.id)}
+                    isSelected={selectedIds.includes(msg.id)}
+                    selectionMode={selectedIds.length > 0}
+                    onStartSelection={() => startSelection(index)}
+                    onExtendSelection={() => extendSelection(index)}
+                    onToggleSelection={() => toggleSelect(msg.id)}
+                  />
+                )
+              }
+              return (
+                <MessageBubble
+                  msg={msg}
+                  isMine={isMine}
+                  isRead={showRead && new Date(otherReadAt!) > new Date(msg.createdAt)}
+                  onDelete={() => handleDelete(msg.id)}
+                  onTogglePin={() => handleTogglePin(msg)}
+                  isSelected={selectedIds.includes(msg.id)}
+                  selectionMode={selectedIds.length > 0}
+                  onStartSelection={() => startSelection(index)}
+                  onExtendSelection={() => extendSelection(index)}
+                  onToggleSelection={() => toggleSelect(msg.id)}
+                />
+              )
+            }}
+            components={{
+              Header: () => <div className="h-4" />,
+              Footer: () => <div className="h-4" />,
+            }}
+          />
+        )}
       </div>
 
-      <MessageInput />
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border bg-card px-4 py-2">
+          <p className="text-sm font-medium">
+            {selectedIds.length} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="destructive" size="sm" onClick={deleteSelected}>
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              <X className="h-3.5 w-3.5" /> Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
-      <AnimatePresence>
-        {isVoiceRoomOpen && (
-          <VoiceRoom roomId={activeChat.id} onLeave={() => setIsVoiceRoomOpen(false)} />
-        )}
-      </AnimatePresence>
+      {canPost ? (
+        <MessageInput />
+      ) : (
+        <div className="border-t border-border px-4 py-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            Only admins can post in this channel.
+          </p>
+        </div>
+      )}
+
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Search in conversation</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSearchOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <Input
+            value={searchQuery}
+            onChange={(e) => runSearch(e.target.value)}
+            placeholder="Type to search messages..."
+            autoFocus
+          />
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {searching && <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />}
+            {!searching && searchResults !== null && searchResults.length === 0 && (
+              <p className="py-2 text-center text-sm text-muted-foreground">No matches</p>
+            )}
+            {!searching &&
+              searchResults?.map((m) => (
+                <button
+                  key={m.id}
+                  className="block w-full rounded-xl bg-accent/50 px-3 py-2 text-left text-sm hover:bg-accent"
+                  onClick={() => setSearchOpen(false)}
+                >
+                  <span className="block truncate">{m.content || m.mediaUrl || "(media)"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatMessageTime(m.createdAt)} • {m.sender?.username ? `@${m.sender.username}` : "You"}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Report {name}</DialogTitle>
+          </DialogHeader>
+          {reportSent ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <Flag className="h-10 w-10 text-emerald-500" />
+              <p className="font-medium">Report submitted</p>
+              <p className="text-sm text-muted-foreground">Moderators will review it shortly.</p>
+              <Button className="mt-2" onClick={() => setReportOpen(false)}>Done</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This conversation will be sent to moderators for review. Abusing reports may lead to restrictions.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setReportOpen(false)}>Cancel</Button>
+                <Button variant="destructive" disabled={reportSending} onClick={submitReport}>
+                  {reportSending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Submit report
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

@@ -2,14 +2,21 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mic, Square, Trash2, Send, Play, Pause } from "lucide-react"
+import { Mic, Square, Trash2, Send, Play, Pause, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function VoiceRecorder() {
+interface VoiceRecorderProps {
+  onSendAudio: (blob: Blob, duration: number) => Promise<void>
+}
+
+const WAVE_HEIGHTS = Array.from({ length: 20 }, () => Math.floor(Math.random() * 24) + 4)
+
+export function VoiceRecorder({ onSendAudio }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [duration, setDuration] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -20,6 +27,12 @@ export function VoiceRecorder() {
       if (timerRef.current) clearInterval(timerRef.current)
       mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop())
     }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+    if (timerRef.current) clearInterval(timerRef.current)
   }, [])
 
   const startRecording = useCallback(async () => {
@@ -52,13 +65,7 @@ export function VoiceRecorder() {
     } catch {
       // permission denied
     }
-  }, [])
-
-  const stopRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop()
-    setIsRecording(false)
-    if (timerRef.current) clearInterval(timerRef.current)
-  }, [])
+  }, [stopRecording])
 
   const cancelRecording = useCallback(() => {
     setAudioBlob(null)
@@ -82,6 +89,15 @@ export function VoiceRecorder() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 
+  const sendRecording = useCallback(async () => {
+    if (!audioBlob) return
+    setIsSending(true)
+    await onSendAudio(audioBlob, duration)
+    setIsSending(false)
+    setAudioBlob(null)
+    setDuration(0)
+  }, [audioBlob, duration, onSendAudio])
+
   if (audioBlob) {
     return (
       <motion.div
@@ -98,11 +114,11 @@ export function VoiceRecorder() {
           </div>
         </div>
         <span className="text-xs text-muted-foreground tabular-nums">{formatTime(duration)}</span>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={cancelRecording}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={cancelRecording} disabled={isSending}>
           <Trash2 className="h-4 w-4" />
         </Button>
-        <Button size="icon" className="h-8 w-8 rounded-xl">
-          <Send className="h-4 w-4" />
+        <Button size="icon" className="h-8 w-8 rounded-xl" onClick={sendRecording} disabled={isSending}>
+          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </motion.div>
     )
@@ -123,10 +139,10 @@ export function VoiceRecorder() {
           />
           <span className="text-sm font-medium tabular-nums text-destructive">{formatTime(duration)}</span>
           <div className="flex-1 flex items-center gap-0.5">
-            {Array.from({ length: 20 }).map((_, i) => (
+            {WAVE_HEIGHTS.map((h, i) => (
               <motion.div
                 key={i}
-                animate={{ height: [4, Math.random() * 24 + 4, 4] }}
+                animate={{ height: [4, h, 4] }}
                 transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.05 }}
                 className="w-1 rounded-full bg-destructive/60"
               />

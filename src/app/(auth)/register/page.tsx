@@ -1,5 +1,11 @@
+import { Suspense } from "react"
 import { AuthForm } from "@/components/auth/auth-form"
 
 export default function RegisterPage() {
-  return <AuthForm mode="register" />
+  // AuthForm reads `next` from the query string, which needs a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <AuthForm mode="register" />
+    </Suspense>
+  )
 }

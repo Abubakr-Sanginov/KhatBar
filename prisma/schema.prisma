@@ -13,6 +13,11 @@ enum UserStatus {
   OFFLINE
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 enum ChatType {
   PRIVATE
   GROUP
@@ -22,6 +27,7 @@ enum ChatType {
 enum MemberRole {
   OWNER
   ADMIN
+  MODERATOR
   MEMBER
 }
 
@@ -34,20 +40,42 @@ enum MessageType {
   STICKER
   FILE
   SYSTEM
+  CALL
+}
+
+enum CallStatus {
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  CANCELED
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
 }
 
 model User {
   id             String     @id @default(cuid())
   email          String     @unique
-  username       String     @unique
+  username       String?    @unique
   displayName    String?
   passwordHash   String
   avatarUrl      String?
   bio            String?
   phone          String?
   status         UserStatus @default(OFFLINE)
+  role           UserRole   @default(USER)
   lastSeen       DateTime   @default(now())
   isVerified     Boolean    @default(false)
+  privacyShowStatus   Boolean @default(true)
+  privacyShowLastSeen Boolean @default(true)
+  privacyReadReceipts Boolean @default(true)
+  /// Public half of the browser ECDH identity key. The private half never leaves
+  /// the user's browser and is deliberately not represented in this schema.
+  encryptionPublicKey String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -55,6 +83,8 @@ model User {
   chats          ChatMember[]
   ownedChats     Chat[]         @relation("ChatOwner")
   pinnedMessages MessagePin[]
+  reports        Report[]
+  startedCalls   Call[]         @relation("CallStarter")
 
   @@index([email])
   @@index([username])
@@ -66,22 +96,31 @@ model Chat {
   id             String     @id @default(cuid())
   type           ChatType   @default(PRIVATE)
   name           String?
+  username       String?    @unique
   description    String?
   avatarUrl      String?
   ownerId        String?
   owner          User?      @relation("ChatOwner", fields: [ownerId], references: [id])
   isPublic       Boolean    @default(false)
   inviteCode     String?    @unique
+  linkedChannelId String?   @unique
+  linkedChannel  Chat?      @relation("ChatChannelLink", fields: [linkedChannelId], references: [id], onDelete: SetNull)
+  linkedGroups   Chat[]     @relation("ChatChannelLink")
+  /// Public per-chat salt used with the participants' ECDH shared secret.
+  /// It is not secret; it prevents key reuse between chats.
+  encryptionSalt String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
   messages       Message[]
   members        ChatMember[]
   pinnedMessages MessagePin[]
+  calls          Call[]
 
   @@index([type])
   @@index([ownerId])
   @@index([inviteCode])
+  @@index([username])
   @@map("chats")
 }
 
@@ -90,6 +129,9 @@ model ChatMember {
   role           MemberRole @default(MEMBER)
   joinedAt       DateTime   @default(now())
   lastReadAt     DateTime   @default(now())
+  /// A private-group AES key, individually wrapped for this member. The
+  /// unwrapped key exists only in the participant's browser.
+  encryptedChatKey String?
 
   userId         String
   user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -111,6 +153,8 @@ model Message {
   mediaHeight    Int?
   mediaDuration  Float?
   thumbnailUrl   String?
+  /// Private-chat content is an authenticated ciphertext envelope, never text.
+  isEncrypted    Boolean       @default(false)
   isEdited       Boolean       @default(false)
   isPinned       Boolean       @default(false)
   replyToId      String?
@@ -127,6 +171,8 @@ model Message {
   senderId       String
   sender         User          @relation(fields: [senderId], references: [id])
   pinnedBy       MessagePin[]
+  callId         String?       @unique
+  call           Call?         @relation(fields: [callId], references: [id], onDelete: SetNull)
 
   @@index([chatId, createdAt])
   @@index([senderId])
@@ -152,6 +198,26 @@ model MessagePin {
   @@map("message_pins")
 }
 
+model Call {
+  id          String     @id @default(cuid())
+  status      CallStatus @default(ONGOING)
+  isVideo     Boolean    @default(false)
+  startedAt   DateTime   @default(now())
+  answeredAt  DateTime?
+  endedAt     DateTime?
+  durationSec Int        @default(0)
+
+  chatId      String
+  chat        Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  starterId   String
+  starter     User       @relation("CallStarter", fields: [starterId], references: [id])
+  message     Message?
+
+  @@index([chatId, startedAt])
+  @@index([starterId])
+  @@map("calls")
+}
+
 model Session {
   id        String   @id @default(cuid())
   token     String   @unique
@@ -163,4 +229,20 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reason     String
+  status     ReportStatus @default(OPEN)
+  chatId     String?
+  messageId  String?
+  createdAt  DateTime     @default(now())
+
+  reporterId String
+  reporter   User         @relation(fields: [reporterId], references: [id])
+
+  @@index([status])
+  @@index([reporterId])
+  @@map("reports")
 }

@@ -11,6 +11,9 @@ interface ChatStore {
   addMessage: (chatId: string, message: Message) => void
   setMessages: (chatId: string, messages: Message[]) => void
   prependMessages: (chatId: string, messages: Message[]) => void
+  touchChat: (chatId: string, message: Message) => void
+  updateMemberStatus: (userId: string, status: User["status"]) => void
+  updateMemberLastRead: (chatId: string, userId: string, lastReadAt: string) => void
   incrementUnread: (chatId: string) => void
   resetUnread: (chatId: string) => void
 }
@@ -20,14 +23,39 @@ export const useChatStore = create<ChatStore>((set) => ({
   activeChat: null,
   messages: {},
   unreadCounts: {},
-  setChats: (chats) => set({ chats }),
+  setChats: (chats) =>
+    set((state) => {
+      const unreadCounts: Record<string, number> = { ...state.unreadCounts }
+      for (const c of chats) {
+        if (!(c.id in unreadCounts)) unreadCounts[c.id] = c.unreadCount || 0
+      }
+      return { chats, unreadCounts }
+    }),
   setActiveChat: (chat) => set({ activeChat: chat }),
   addMessage: (chatId, message) =>
+    set((state) => {
+      const existing = state.messages[chatId] || []
+      if (existing.some((m) => m.id === message.id)) return state
+      return {
+        messages: {
+          ...state.messages,
+          [chatId]: [...existing, message],
+        },
+      }
+    }),
+  touchChat: (chatId, message) =>
     set((state) => ({
-      messages: {
-        ...state.messages,
-        [chatId]: [...(state.messages[chatId] || []), message],
-      },
+      chats: state.chats
+        .map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                messages: [message, ...(chat.messages || []).filter((m) => m.id !== message.id)].slice(0, 1),
+                updatedAt: message.createdAt,
+              }
+            : chat,
+        )
+        .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()),
     })),
   setMessages: (chatId, messages) =>
     set((state) => ({
@@ -40,16 +68,38 @@ export const useChatStore = create<ChatStore>((set) => ({
         [chatId]: [...messages, ...(state.messages[chatId] || [])],
       },
     })),
+  updateMemberStatus: (userId, status) =>
+    set((state) => ({
+      chats: state.chats.map((chat) => ({
+        ...chat,
+        members: chat.members.map((m) =>
+          m.user.id === userId ? { ...m, user: { ...m.user, status } } : m,
+        ),
+      })),
+    })),
   incrementUnread: (chatId) =>
     set((state) => ({
       unreadCounts: {
         ...state.unreadCounts,
         [chatId]: (state.unreadCounts[chatId] || 0) + 1,
       },
+      chats: state.chats.map((c) => (c.id === chatId ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c)),
     })),
   resetUnread: (chatId) =>
     set((state) => ({
       unreadCounts: { ...state.unreadCounts, [chatId]: 0 },
+      chats: state.chats.map((c) => (c.id === chatId ? { ...c, unreadCount: 0 } : c)),
+    })),
+  updateMemberLastRead: (chatId, userId, lastReadAt) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              members: c.members.map((m) => (m.user.id === userId ? { ...m, lastReadAt } : m)),
+            }
+          : c,
+      ),
     })),
 }))
 
@@ -81,4 +131,18 @@ export const useUIStore = create<UIStore>((set) => ({
   isInfoPanelOpen: true,
   toggleSidebar: () => set((s) => ({ isMobileSidebarOpen: !s.isMobileSidebarOpen })),
   toggleInfoPanel: () => set((s) => ({ isInfoPanelOpen: !s.isInfoPanelOpen })),
+}))
+
+interface SocketStore {
+  token: string | null
+  isConnected: boolean
+  setToken: (token: string | null) => void
+  setConnected: (connected: boolean) => void
+}
+
+export const useSocketStore = create<SocketStore>((set) => ({
+  token: null,
+  isConnected: false,
+  setToken: (token) => set({ token }),
+  setConnected: (isConnected) => set({ isConnected }),
 }))

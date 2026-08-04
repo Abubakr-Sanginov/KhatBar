@@ -2,6 +2,9 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { AuthProvider } from "@/hooks/use-auth"
+import { CallProvider } from "@/hooks/use-call"
+import { CallOverlay } from "@/components/call/call-overlay"
+import { UsernameSetupDialog } from "@/components/auth/username-setup-dialog"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -32,7 +35,13 @@ export default function RootLayout({
     >
       <body className="h-full font-sans">
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <CallProvider>
+              {children}
+              <UsernameSetupDialog />
+              <CallOverlay />
+            </CallProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

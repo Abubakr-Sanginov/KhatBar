@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "KhatBar",
+    "slug": "khatbar",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.khatbar.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "KhatBar needs camera access for video calls",
+        "NSMicrophoneUsageDescription": "KhatBar needs microphone access for calls and voice messages",
+        "NSPhotoLibraryUsageDescription": "KhatBar needs photo library access to send images"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.khatbar.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
