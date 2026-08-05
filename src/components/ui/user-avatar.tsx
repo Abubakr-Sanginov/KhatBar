@@ -24,9 +24,9 @@ const statusSizeMap = {
 }
 
 const statusColorMap: Record<string, string> = {
-  ONLINE: "bg-emerald-500",
-  IDLE: "bg-amber-400",
-  DO_NOT_DISTURB: "bg-red-500",
+  ONLINE: "bg-success",
+  IDLE: "bg-warning",
+  DO_NOT_DISTURB: "bg-destructive",
   OFFLINE: "bg-muted-foreground",
 }
 

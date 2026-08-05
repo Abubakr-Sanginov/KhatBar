@@ -9,13 +9,16 @@ import {
   Alert,
 } from "react-native";
 import { useAuthStore } from "../../stores/auth-store";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 
 export default function UsernameScreen() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const setUsernameAction = useAuthStore((s) => s.setUsername);
   const user = useAuthStore((s) => s.user);
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
 
   const handleSubmit = async () => {
     if (!username.trim()) {
@@ -49,7 +52,7 @@ export default function UsernameScreen() {
           <TextInput
             style={styles.input}
             placeholder="username"
-            placeholderTextColor={Colors.dark.muted}
+            placeholderTextColor={colors.muted}
             value={username}
             onChangeText={(t) => setUsername(t.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())}
             autoCapitalize="none"
@@ -63,7 +66,7 @@ export default function UsernameScreen() {
           disabled={loading || !username.trim()}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.buttonText}>Continue</Text>
           )}
@@ -77,65 +80,66 @@ export default function UsernameScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  inner: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: Colors.dark.text,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: Colors.dark.textSecondary,
-    textAlign: "center",
-    marginBottom: 32,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  atSign: {
-    fontSize: 18,
-    color: Colors.dark.muted,
-    marginRight: 4,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.dark.text,
-  },
-  button: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  skipButton: {
-    marginTop: 16,
-    alignItems: "center",
-  },
-  skipText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 15,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    inner: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: 24,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 32,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      marginBottom: 16,
+    },
+    atSign: {
+      fontSize: 18,
+      color: colors.muted,
+      marginRight: 4,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: colors.text,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: colors.onPrimary,
+      fontSize: 17,
+      fontWeight: "600",
+    },
+    skipButton: {
+      marginTop: 16,
+      alignItems: "center",
+    },
+    skipText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+    },
+  });

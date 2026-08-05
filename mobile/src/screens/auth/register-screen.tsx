@@ -11,7 +11,8 @@ import {
   Alert,
 } from "react-native";
 import { useAuthStore } from "../../stores/auth-store";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 
 export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -19,6 +20,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const register = useAuthStore((s) => s.register);
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
 
   const handleRegister = async () => {
     if (!email || !password) {
@@ -47,7 +50,7 @@ export default function RegisterScreen({ navigation }: any) {
         <TextInput
           style={styles.input}
           placeholder="Display Name"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={displayName}
           onChangeText={setDisplayName}
           autoCapitalize="words"
@@ -56,7 +59,7 @@ export default function RegisterScreen({ navigation }: any) {
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -67,7 +70,7 @@ export default function RegisterScreen({ navigation }: any) {
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -80,7 +83,7 @@ export default function RegisterScreen({ navigation }: any) {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.buttonText}>Create Account</Text>
           )}
@@ -99,60 +102,61 @@ export default function RegisterScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  inner: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: Colors.dark.text,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.dark.textSecondary,
-    textAlign: "center",
-    marginBottom: 40,
-  },
-  input: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.dark.text,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  linkButton: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-  linkText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
-  },
-  linkBold: {
-    color: Colors.dark.primary,
-    fontWeight: "600",
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    inner: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: 24,
+    },
+    title: {
+      fontSize: 36,
+      fontWeight: "bold",
+      color: colors.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 40,
+    },
+    input: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 12,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    buttonText: {
+      color: colors.onPrimary,
+      fontSize: 17,
+      fontWeight: "600",
+    },
+    linkButton: {
+      marginTop: 20,
+      alignItems: "center",
+    },
+    linkText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    linkBold: {
+      color: colors.primary,
+      fontWeight: "600",
+    },
+  });

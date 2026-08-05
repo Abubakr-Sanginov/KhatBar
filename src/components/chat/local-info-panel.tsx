@@ -30,7 +30,7 @@ export function LocalInfoPanel() {
           <p className="text-lg font-semibold">{chat.peerName}</p>
           <p
             className={`flex items-center gap-1 text-xs ${
-              peer?.online ? "text-green-500" : "text-muted-foreground"
+              peer?.online ? "text-success" : "text-muted-foreground"
             }`}
           >
             {peer?.online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}

@@ -51,8 +51,8 @@ const REPORT_REASONS = ["Spam", "Harassment", "Impersonation", "Inappropriate co
 function RoleBadge({ role }: { role: MemberRole }) {
   const styles: Record<MemberRole, string> = {
     OWNER: "bg-primary/10 text-primary",
-    ADMIN: "bg-amber-500/10 text-amber-600",
-    MODERATOR: "bg-blue-500/10 text-blue-600",
+    ADMIN: "bg-warning/15 text-warning",
+    MODERATOR: "bg-info/15 text-info",
     MEMBER: "bg-muted text-muted-foreground",
   }
   return (
@@ -280,7 +280,9 @@ export function InfoPanel() {
               )}
             </>
           ) : (
-            <p className="text-sm text-emerald-500">{other?.status === "ONLINE" ? "Online" : "Offline"}</p>
+            <p className={cn("text-sm", other?.status === "ONLINE" ? "text-success" : "text-muted-foreground")}>
+              {other?.status === "ONLINE" ? "Online" : "Offline"}
+            </p>
           )}
         </div>
 
@@ -292,7 +294,7 @@ export function InfoPanel() {
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
               {linkCopied ? (
-                <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+                <Check className="h-4 w-4 shrink-0 text-success" />
               ) : (
                 <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
               )}
@@ -330,7 +332,7 @@ export function InfoPanel() {
             {activeChat.linkedChannel ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm">
-                  <LinkIcon className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <LinkIcon className="h-4 w-4 shrink-0 text-success" />
                   <span className="min-w-0 flex-1 truncate">
                     {activeChat.linkedChannel.name ||
                       (activeChat.linkedChannel.username ? `@${activeChat.linkedChannel.username}` : "Channel")}
@@ -547,7 +549,7 @@ export function InfoPanel() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-500" /> End-to-end encrypted
+              <ShieldCheck className="h-5 w-5 text-success" /> End-to-end encrypted
             </DialogTitle>
             <DialogDescription>
               Messages in this chat are protected with TLS in transit and stored securely. Keys are generated per chat,
@@ -570,7 +572,7 @@ export function InfoPanel() {
           </DialogHeader>
           {reportSent ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+              <CheckCircle2 className="h-10 w-10 text-success" />
               <p className="font-medium">Report submitted</p>
               <p className="text-sm text-muted-foreground">Thanks for helping keep KhatBar safe. Moderators will review it shortly.</p>
               <Button className="mt-2" onClick={() => setReportOpen(false)}>Done</Button>

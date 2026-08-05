@@ -1,10 +1,12 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Bricolage_Grotesque, Geist, Geist_Mono, Manrope } from "next/font/google"
 import { ThemeProvider } from "@/components/providers/theme-provider"
+import { skinScript } from "@/hooks/use-skin"
 import { AuthProvider } from "@/hooks/use-auth"
 import { CallProvider } from "@/hooks/use-call"
 import { CallOverlay } from "@/components/call/call-overlay"
 import { UsernameSetupDialog } from "@/components/auth/username-setup-dialog"
+import { DEFAULT_SKIN } from "@/lib/skins"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -15,6 +17,20 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+})
+
+// Typefaces for the Ember interface: a display face for headings, a body face
+// for everything else. Loaded up front so switching interfaces is instant.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  display: "swap",
+})
+
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  display: "swap",
 })
 
 export const metadata: Metadata = {
@@ -30,9 +46,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bricolage.variable} ${manrope.variable} h-full antialiased`}
+      data-skin={DEFAULT_SKIN}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: skinScript }} />
+      </head>
       <body className="h-full font-sans">
         <ThemeProvider>
           <AuthProvider>

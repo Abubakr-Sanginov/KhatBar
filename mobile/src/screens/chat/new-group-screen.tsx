@@ -12,7 +12,8 @@ import {
 } from "react-native";
 import { useChatStore } from "../../stores/chat-store";
 import { usersApi } from "../../api/users";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 import { getInitials, displayName } from "../../lib/utils";
 import type { User } from "../../types";
 
@@ -26,6 +27,8 @@ export default function NewGroupScreen({ navigation }: any) {
   const [isSearching, setIsSearching] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const { createChat } = useChatStore();
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
 
   const handleSearch = async (query: string) => {
     setSearch(query);
@@ -87,7 +90,7 @@ export default function NewGroupScreen({ navigation }: any) {
         <TextInput
           style={styles.input}
           placeholder="Group name"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={groupName}
           onChangeText={setGroupName}
         />
@@ -98,7 +101,7 @@ export default function NewGroupScreen({ navigation }: any) {
             <TextInput
               style={styles.usernameInput}
               placeholder="username (optional)"
-              placeholderTextColor={Colors.dark.muted}
+              placeholderTextColor={colors.muted}
               value={username}
               onChangeText={(t) => setUsername(t.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())}
               autoCapitalize="none"
@@ -111,7 +114,7 @@ export default function NewGroupScreen({ navigation }: any) {
           <Switch
             value={isPublic}
             onValueChange={setIsPublic}
-            trackColor={{ false: Colors.dark.muted, true: Colors.dark.primary }}
+            trackColor={{ false: colors.muted, true: colors.primary }}
           />
         </View>
       </View>
@@ -141,7 +144,7 @@ export default function NewGroupScreen({ navigation }: any) {
         <TextInput
           style={styles.searchInput}
           placeholder="Add members..."
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={handleSearch}
           autoCapitalize="none"
@@ -170,7 +173,7 @@ export default function NewGroupScreen({ navigation }: any) {
         }}
         ListEmptyComponent={
           isSearching ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color={Colors.dark.primary} />
+            <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
           ) : null
         }
       />
@@ -181,7 +184,7 @@ export default function NewGroupScreen({ navigation }: any) {
         disabled={!groupName.trim() || isCreating}
       >
         {isCreating ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.onPrimary} />
         ) : (
           <Text style={styles.createButtonText}>Create Group</Text>
         )}
@@ -190,128 +193,129 @@ export default function NewGroupScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  headerSection: {
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  input: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.dark.text,
-    marginBottom: 12,
-  },
-  usernameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-  },
-  atSign: {
-    fontSize: 16,
-    color: Colors.dark.muted,
-  },
-  usernameInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.dark.text,
-    marginLeft: 4,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  toggleLabel: {
-    color: Colors.dark.text,
-    fontSize: 15,
-  },
-  selectedSection: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    maxHeight: 60,
-  },
-  selectedChip: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-  },
-  selectedChipText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  searchContainer: {
-    padding: 12,
-  },
-  searchInput: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.dark.text,
-  },
-  userItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  userItemSelected: {
-    backgroundColor: "rgba(10,132,255,0.1)",
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.dark.muted,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  userAvatarText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  userName: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.dark.text,
-  },
-  checkmark: {
-    color: Colors.dark.primary,
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  createButton: {
-    backgroundColor: Colors.dark.primary,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  createButtonDisabled: {
-    opacity: 0.4,
-  },
-  createButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerSection: {
+      padding: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    input: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 12,
+    },
+    usernameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      marginBottom: 12,
+    },
+    atSign: {
+      fontSize: 16,
+      color: colors.muted,
+    },
+    usernameInput: {
+      flex: 1,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginLeft: 4,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    toggleLabel: {
+      color: colors.text,
+      fontSize: 15,
+    },
+    selectedSection: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      maxHeight: 60,
+    },
+    selectedChip: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginRight: 8,
+    },
+    selectedChipText: {
+      color: colors.onPrimary,
+      fontSize: 13,
+      fontWeight: "500",
+    },
+    searchContainer: {
+      padding: 12,
+    },
+    searchInput: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: colors.text,
+    },
+    userItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    userItemSelected: {
+      backgroundColor: colors.selection,
+    },
+    userAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.muted,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    userAvatarText: {
+      color: colors.onPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    userName: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.text,
+    },
+    checkmark: {
+      color: colors.primary,
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+    createButton: {
+      backgroundColor: colors.primary,
+      marginHorizontal: 16,
+      marginVertical: 12,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    createButtonDisabled: {
+      opacity: 0.4,
+    },
+    createButtonText: {
+      color: colors.onPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });

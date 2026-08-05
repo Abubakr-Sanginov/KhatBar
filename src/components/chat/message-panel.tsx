@@ -450,10 +450,10 @@ export function MessagePanel() {
               ) : username ? (
                 <>
                   @{username}
-                  {other?.status === "ONLINE" && <span className="text-emerald-500"> • Online</span>}
+                  {other?.status === "ONLINE" && <span className="text-success"> • Online</span>}
                 </>
               ) : (
-                other?.status === "ONLINE" && <span className="text-emerald-500">Online</span>
+                other?.status === "ONLINE" && <span className="text-success">Online</span>
               )}
             </p>
           </div>
@@ -628,7 +628,7 @@ export function MessagePanel() {
           </DialogHeader>
           {reportSent ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <Flag className="h-10 w-10 text-emerald-500" />
+              <Flag className="h-10 w-10 text-success" />
               <p className="font-medium">Report submitted</p>
               <p className="text-sm text-muted-foreground">Moderators will review it shortly.</p>
               <Button className="mt-2" onClick={() => setReportOpen(false)}>Done</Button>

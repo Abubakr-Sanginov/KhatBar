@@ -223,7 +223,7 @@ export function ChatSidebar() {
               )}
               <DropdownMenuItem onClick={() => setIsPrivacyOpen(true)}>
                 <Settings2 className="h-4 w-4" />
-                Privacy & Settings
+                Settings
               </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => { await logout(); router.push("/login") }}>
                 <LogOut className="h-4 w-4" />

@@ -11,11 +11,14 @@ import {
 } from "react-native";
 import { useAuthStore } from "../../stores/auth-store";
 import { usersApi } from "../../api/users";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 
 export default function ProfileScreen({ navigation }: any) {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
 
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -64,7 +67,7 @@ export default function ProfileScreen({ navigation }: any) {
           value={displayName}
           onChangeText={setDisplayName}
           placeholder="Display name"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
         />
 
         <Text style={styles.label}>Username</Text>
@@ -75,7 +78,7 @@ export default function ProfileScreen({ navigation }: any) {
             value={username}
             onChangeText={(t) => setUsername(t.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())}
             placeholder="username"
-            placeholderTextColor={Colors.dark.muted}
+            placeholderTextColor={colors.muted}
             autoCapitalize="none"
             editable={!user?.username}
           />
@@ -90,7 +93,7 @@ export default function ProfileScreen({ navigation }: any) {
           value={bio}
           onChangeText={setBio}
           placeholder="About you..."
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           multiline
           numberOfLines={3}
         />
@@ -101,7 +104,7 @@ export default function ProfileScreen({ navigation }: any) {
           value={phone}
           onChangeText={setPhone}
           placeholder="+1 234 567 890"
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           keyboardType="phone-pad"
         />
       </View>
@@ -112,7 +115,7 @@ export default function ProfileScreen({ navigation }: any) {
         disabled={saving}
       >
         {saving ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.onPrimary} />
         ) : (
           <Text style={styles.saveText}>Save Changes</Text>
         )}
@@ -121,106 +124,107 @@ export default function ProfileScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: Colors.dark.text,
-  },
-  avatarSection: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.dark.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  avatarText: {
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: "bold",
-  },
-  changePhoto: {
-    color: Colors.dark.primary,
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  form: {
-    paddingHorizontal: 20,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.dark.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    marginTop: 16,
-  },
-  input: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.dark.text,
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  usernameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  atSign: {
-    fontSize: 16,
-    color: Colors.dark.muted,
-  },
-  usernameInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.dark.text,
-    marginLeft: 4,
-  },
-  hint: {
-    fontSize: 12,
-    color: Colors.dark.muted,
-    marginTop: 4,
-  },
-  saveButton: {
-    marginHorizontal: 20,
-    marginTop: 32,
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 12,
+    },
+    headerTitle: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.text,
+    },
+    avatarSection: {
+      alignItems: "center",
+      paddingVertical: 20,
+    },
+    avatarLarge: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10,
+    },
+    avatarText: {
+      color: colors.onPrimary,
+      fontSize: 40,
+      fontWeight: "bold",
+    },
+    changePhoto: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: "500",
+    },
+    form: {
+      paddingHorizontal: 20,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textSecondary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 6,
+      marginTop: 16,
+    },
+    input: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+    },
+    textArea: {
+      minHeight: 80,
+      textAlignVertical: "top",
+    },
+    usernameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+    },
+    atSign: {
+      fontSize: 16,
+      color: colors.muted,
+    },
+    usernameInput: {
+      flex: 1,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginLeft: 4,
+    },
+    hint: {
+      fontSize: 12,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    saveButton: {
+      marginHorizontal: 20,
+      marginTop: 32,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginBottom: 40,
+    },
+    saveButtonDisabled: {
+      opacity: 0.5,
+    },
+    saveText: {
+      color: colors.onPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });

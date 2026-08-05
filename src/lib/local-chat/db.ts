@@ -10,39 +10,58 @@
 import type { LocalChat, LocalMessage, OutboxItem } from "./types"
 
 const DB_NAME = "khatbar-local"
-const DB_VERSION = 1
+// bumped so pre-existing DBs from earlier builds get the missing stores
+const DB_VERSION = 2
+
+const REQUIRED_STORES = ["chats", "messages", "outbox"]
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise
+function dropDatabase(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = globalThis.indexedDB.deleteDatabase(DB_NAME)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error)
+    req.onblocked = () => reject(new Error("database blocked"))
+  })
+}
+
+async function openDbInternal(): Promise<IDBDatabase> {
   const factory = globalThis.indexedDB as IDBFactory | undefined
   if (!factory) throw new Error("IndexedDB unavailable")
-  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = factory.open(DB_NAME, DB_VERSION)
     req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains("chats")) {
-        const chats = db.createObjectStore("chats", { keyPath: "id" })
+      const result = req.result
+      if (!result.objectStoreNames.contains("chats")) {
+        const chats = result.createObjectStore("chats", { keyPath: "id" })
         chats.createIndex("peerId", "peerId", { unique: true })
       }
-      if (!db.objectStoreNames.contains("messages")) {
-        const messages = db.createObjectStore("messages", { keyPath: "id" })
+      if (!result.objectStoreNames.contains("messages")) {
+        const messages = result.createObjectStore("messages", { keyPath: "id" })
         messages.createIndex("chatId", "chatId")
         messages.createIndex("byChatTime", ["chatId", "createdAt"])
       }
-      if (!db.objectStoreNames.contains("outbox")) {
-        const outbox = db.createObjectStore("outbox", { keyPath: "id" })
+      if (!result.objectStoreNames.contains("outbox")) {
+        const outbox = result.createObjectStore("outbox", { keyPath: "id" })
         outbox.createIndex("peerId", "peerId")
         outbox.createIndex("state", "state")
       }
     }
     req.onsuccess = () => resolve(req.result)
-    req.onerror = () => {
-      dbPromise = null
-      reject(req.error)
-    }
+    req.onerror = () => reject(req.error)
   })
+  // A DB left behind by an even older build may still lack the stores.
+  if (!REQUIRED_STORES.every((s) => db.objectStoreNames.contains(s))) {
+    db.close()
+    await dropDatabase()
+    return openDbInternal()
+  }
+  return db
+}
+
+function openDb(): Promise<IDBDatabase> {
+  if (!dbPromise) dbPromise = openDbInternal()
   return dbPromise
 }
 

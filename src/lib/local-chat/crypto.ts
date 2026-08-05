@@ -9,24 +9,42 @@
 const idb = () => globalThis.indexedDB as IDBFactory | undefined
 
 const KEY_STORE = "khatbar-local-keys"
-const KEY_DB_VERSION = 1
+// bumped so pre-existing DBs from earlier builds get the missing stores
+const KEY_DB_VERSION = 2
+
+const REQUIRED_STORES = ["keys", "shared"]
+
+function dropDatabase(name: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = idb()!.deleteDatabase(name)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error)
+    req.onblocked = () => reject(new Error("database blocked"))
+  })
+}
 
 async function openKeyDb(): Promise<IDBDatabase> {
   const factory = idb()
   if (!factory) throw new Error("IndexedDB unavailable in this browser")
-  return new Promise((resolve, reject) => {
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = factory.open(KEY_STORE, KEY_DB_VERSION)
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains("keys")) {
-        req.result.createObjectStore("keys")
-      }
-      if (!req.result.objectStoreNames.contains("shared")) {
-        req.result.createObjectStore("shared")
+      for (const store of REQUIRED_STORES) {
+        if (!req.result.objectStoreNames.contains(store)) {
+          req.result.createObjectStore(store)
+        }
       }
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
+  // A DB left behind by an even older build may still lack the stores.
+  if (!REQUIRED_STORES.every((s) => db.objectStoreNames.contains(s))) {
+    db.close()
+    await dropDatabase(KEY_STORE)
+    return openKeyDb()
+  }
+  return db
 }
 
 async function getRecord<T>(storeName: string, key: string): Promise<T | undefined> {

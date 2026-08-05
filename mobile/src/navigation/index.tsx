@@ -1,10 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { ActivityIndicator, View, Text } from "react-native";
 import { useAuthStore } from "../stores/auth-store";
-import { Colors } from "../theme/colors";
+import { useThemeStore } from "../stores/theme-store";
+import { useThemeColors } from "../hooks/use-theme";
+import type { ThemeColors } from "../theme/colors";
 
 import LoginScreen from "../screens/auth/login-screen";
 import RegisterScreen from "../screens/auth/register-screen";
@@ -23,87 +25,77 @@ const AuthStack = createNativeStackNavigator();
 const ChatStack = createNativeStackNavigator();
 const SettingsStack = createNativeStackNavigator();
 
+/** Header chrome shared by every pushed screen, in the active palette. */
+function headerOptions(colors: ThemeColors, title: string) {
+  return {
+    headerShown: true,
+    headerTitle: title,
+    headerStyle: { backgroundColor: colors.background },
+    headerTintColor: colors.text,
+    headerTitleStyle: { color: colors.text },
+  };
+}
+
 function ChatStackNavigator() {
+  const colors = useThemeColors();
   return (
     <ChatStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.dark.background },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <ChatStack.Screen name="ChatList" component={ChatListScreen} />
       <ChatStack.Screen
         name="Chat"
         component={ChatScreen}
-        options={({ route }: any) => ({
-          headerShown: true,
-          headerTitle: route.params?.chatName || "Chat",
-          headerStyle: { backgroundColor: Colors.dark.background },
-          headerTintColor: Colors.dark.text,
-          headerTitleStyle: { color: Colors.dark.text },
-        })}
+        options={({ route }: any) => headerOptions(colors, route.params?.chatName || "Chat")}
       />
       <ChatStack.Screen
         name="NewChat"
         component={NewChatScreen}
-        options={{
-          headerShown: true,
-          headerTitle: "New Chat",
-          headerStyle: { backgroundColor: Colors.dark.background },
-          headerTintColor: Colors.dark.text,
-          headerTitleStyle: { color: Colors.dark.text },
-        }}
+        options={headerOptions(colors, "New Chat")}
       />
       <ChatStack.Screen
         name="NewGroup"
         component={NewGroupScreen}
-        options={{
-          headerShown: true,
-          headerTitle: "New Group",
-          headerStyle: { backgroundColor: Colors.dark.background },
-          headerTintColor: Colors.dark.text,
-          headerTitleStyle: { color: Colors.dark.text },
-        }}
+        options={headerOptions(colors, "New Group")}
       />
     </ChatStack.Navigator>
   );
 }
 
 function SettingsStackNavigator() {
+  const colors = useThemeColors();
   return (
     <SettingsStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.dark.background },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <SettingsStack.Screen name="SettingsMain" component={SettingsScreen} />
       <SettingsStack.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          headerShown: true,
-          headerTitle: "Edit Profile",
-          headerStyle: { backgroundColor: Colors.dark.background },
-          headerTintColor: Colors.dark.text,
-          headerTitleStyle: { color: Colors.dark.text },
-        }}
+        options={headerOptions(colors, "Edit Profile")}
       />
     </SettingsStack.Navigator>
   );
 }
 
 function MainTabs() {
+  const colors = useThemeColors();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.dark.tabBar,
-          borderTopColor: Colors.dark.tabBarBorder,
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.tabBarBorder,
         },
-        tabBarActiveTintColor: Colors.dark.primary,
-        tabBarInactiveTintColor: Colors.dark.muted,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
       }}
     >
       <Tab.Screen
@@ -131,11 +123,12 @@ function MainTabs() {
 }
 
 function AuthNavigator() {
+  const colors = useThemeColors();
   return (
     <AuthStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.dark.background },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -146,33 +139,40 @@ function AuthNavigator() {
 
 export default function AppNavigator() {
   const { isAuthenticated, isLoading, user, checkSession } = useAuthStore();
+  const colors = useThemeColors();
+  const mode = useThemeStore((s) => s.mode);
+  const isThemeHydrated = useThemeStore((s) => s.isHydrated);
 
   useEffect(() => {
     checkSession();
   }, []);
 
-  if (isLoading) {
+  const navigationTheme = useMemo(
+    () => ({
+      dark: mode === "dark",
+      colors: {
+        primary: colors.primary,
+        background: colors.background,
+        card: colors.card,
+        text: colors.text,
+        border: colors.border,
+        notification: colors.primary,
+      },
+    }),
+    [colors, mode]
+  );
+
+  // Wait for the stored interface too, so the first frame is not repainted.
+  if (isLoading || !isThemeHydrated) {
     return (
-      <View style={{ flex: 1, backgroundColor: Colors.dark.background, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color={Colors.dark.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer
-      theme={{
-        dark: true,
-        colors: {
-          primary: Colors.dark.primary,
-          background: Colors.dark.background,
-          card: Colors.dark.card,
-          text: Colors.dark.text,
-          border: Colors.dark.border,
-          notification: Colors.dark.primary,
-        },
-      }}
-    >
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Auth" component={AuthNavigator} />

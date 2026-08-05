@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env.production
+.env.production.local
+mobile
+prisma/*.db
+*.log
+README.md
+LICENSE
+.dockerignore

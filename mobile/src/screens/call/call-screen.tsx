@@ -8,9 +8,11 @@ import {
 } from "react-native";
 import { useCallStore } from "../../stores/call-store";
 import { useCall } from "../../hooks/use-call";
-import { Colors } from "../../theme/colors";
+import { useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 
 export default function CallScreen({ navigation }: any) {
+  const styles = useThemedStyles(makeStyles);
   const {
     phase,
     chatName,
@@ -161,123 +163,129 @@ export default function CallScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  incomingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarLarge: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.dark.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  avatarText: {
-    color: "#fff",
-    fontSize: 48,
-    fontWeight: "bold",
-  },
-  callerName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.dark.text,
-    marginBottom: 8,
-  },
-  incomingLabel: {
-    fontSize: 16,
-    color: Colors.dark.textSecondary,
-    marginBottom: 40,
-  },
-  statusText: {
-    fontSize: 16,
-    color: Colors.dark.textSecondary,
-  },
-  timer: {
-    fontSize: 18,
-    color: Colors.dark.primary,
-    marginTop: 16,
-    fontWeight: "500",
-  },
-  incomingActions: {
-    flexDirection: "row",
-    gap: 40,
-  },
-  actionButton: {
-    alignItems: "center",
-    gap: 8,
-  },
-  declineButton: {},
-  acceptButton: {},
-  actionIcon: {
-    fontSize: 32,
-  },
-  actionLabel: {
-    color: Colors.dark.text,
-    fontSize: 14,
-  },
-  controls: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 24,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-  },
-  controlButton: {
-    alignItems: "center",
-    width: 72,
-  },
-  controlButtonOff: {
-    opacity: 0.7,
-  },
-  hangUpButton: {},
-  controlIcon: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  controlLabel: {
-    color: Colors.dark.text,
-    fontSize: 12,
-  },
-  participantTile: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  participantAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.dark.muted,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  participantAvatarText: {
-    color: "#fff",
-    fontSize: 32,
-    fontWeight: "bold",
-  },
-  participantName: {
-    color: Colors.dark.text,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  participantStatus: {
-    color: Colors.dark.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    // The call stage is a full-bleed media surface, so it keeps the immersive
+    // pair in every interface rather than the page background.
+    container: {
+      flex: 1,
+      backgroundColor: colors.immersive,
+    },
+    incomingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    activeContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarLarge: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 20,
+    },
+    avatarText: {
+      color: colors.onPrimary,
+      fontSize: 48,
+      fontWeight: "bold",
+    },
+    callerName: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.onImmersive,
+      marginBottom: 8,
+    },
+    incomingLabel: {
+      fontSize: 16,
+      color: colors.onImmersive,
+      opacity: 0.65,
+      marginBottom: 40,
+    },
+    statusText: {
+      fontSize: 16,
+      color: colors.onImmersive,
+      opacity: 0.65,
+    },
+    timer: {
+      fontSize: 18,
+      color: colors.primary,
+      marginTop: 16,
+      fontWeight: "500",
+    },
+    incomingActions: {
+      flexDirection: "row",
+      gap: 40,
+    },
+    actionButton: {
+      alignItems: "center",
+      gap: 8,
+    },
+    declineButton: {},
+    acceptButton: {},
+    actionIcon: {
+      fontSize: 32,
+    },
+    actionLabel: {
+      color: colors.onImmersive,
+      fontSize: 14,
+    },
+    controls: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 24,
+      paddingBottom: 40,
+      paddingHorizontal: 20,
+    },
+    controlButton: {
+      alignItems: "center",
+      width: 72,
+    },
+    controlButtonOff: {
+      opacity: 0.7,
+    },
+    hangUpButton: {},
+    controlIcon: {
+      fontSize: 28,
+      marginBottom: 4,
+    },
+    controlLabel: {
+      color: colors.onImmersive,
+      fontSize: 12,
+    },
+    participantTile: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    participantAvatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.muted,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 8,
+    },
+    participantAvatarText: {
+      color: colors.onImmersive,
+      fontSize: 32,
+      fontWeight: "bold",
+    },
+    participantName: {
+      color: colors.onImmersive,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    participantStatus: {
+      color: colors.onImmersive,
+      opacity: 0.65,
+      fontSize: 13,
+      marginTop: 2,
+    },
+  });

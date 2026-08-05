@@ -12,7 +12,8 @@ import {
 import { useChatStore } from "../../stores/chat-store";
 import { useAuthStore } from "../../stores/auth-store";
 import { usersApi } from "../../api/users";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 import { getInitials, displayName } from "../../lib/utils";
 import type { User } from "../../types";
 
@@ -23,6 +24,8 @@ export default function NewChatScreen({ navigation }: any) {
   const [isCreating, setIsCreating] = useState(false);
   const { createChat } = useChatStore();
   const currentUser = useAuthStore((s) => s.user);
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
 
   const handleSearch = async (query: string) => {
     setSearch(query);
@@ -59,7 +62,7 @@ export default function NewChatScreen({ navigation }: any) {
         <TextInput
           style={styles.searchInput}
           placeholder="Search users by name or email..."
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={handleSearch}
           autoCapitalize="none"
@@ -99,7 +102,7 @@ export default function NewChatScreen({ navigation }: any) {
         )}
         ListEmptyComponent={
           isSearching ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color={Colors.dark.primary} />
+            <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
           ) : search.length >= 2 ? (
             <Text style={styles.emptyText}>No users found</Text>
           ) : null
@@ -109,7 +112,7 @@ export default function NewChatScreen({ navigation }: any) {
       {isCreating && (
         <View style={StyleSheet.absoluteFill}>
           <View style={styles.creatingOverlay}>
-            <ActivityIndicator size="large" color={Colors.dark.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         </View>
       )}
@@ -117,92 +120,93 @@ export default function NewChatScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  searchContainer: {
-    padding: 12,
-  },
-  searchInput: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: Colors.dark.text,
-  },
-  optionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  optionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.dark.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  optionIconText: {
-    fontSize: 18,
-  },
-  optionText: {
-    color: Colors.dark.primary,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  userItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  userAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.dark.muted,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  userAvatarText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: Colors.dark.text,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
-    marginTop: 2,
-  },
-  emptyText: {
-    textAlign: "center",
-    color: Colors.dark.textSecondary,
-    marginTop: 40,
-    fontSize: 15,
-  },
-  creatingOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    searchContainer: {
+      padding: 12,
+    },
+    searchInput: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+    },
+    optionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    optionIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    optionIconText: {
+      fontSize: 18,
+    },
+    optionText: {
+      color: colors.primary,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    userItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    userAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.muted,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    userAvatarText: {
+      color: colors.onPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    userInfo: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 15,
+      fontWeight: "500",
+      color: colors.text,
+    },
+    userEmail: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    emptyText: {
+      textAlign: "center",
+      color: colors.textSecondary,
+      marginTop: 40,
+      fontSize: 15,
+    },
+    creatingOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });

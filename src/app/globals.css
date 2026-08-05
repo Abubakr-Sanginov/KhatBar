@@ -35,15 +35,93 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-immersive: var(--immersive);
+  --color-immersive-warning: var(--immersive-warning);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--app-font-sans);
+  --font-display: var(--app-font-display);
   --font-mono: var(--font-geist-mono);
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-ember-glow: ember-glow 4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes ember-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(232 112 58 / 0.35); }
+  50% { box-shadow: 0 0 28px 2px rgb(232 112 58 / 0.18); }
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ------------------------------------------------------------------
+   EMBER — raw palette
+   Warm signal in the dark: green-shifted charcoal ink surfaces lit by
+   a single copper accent. Exposed as utilities (bg-ink-900, text-ember-500)
+   for the few places that need the palette directly; everything else
+   consumes the semantic tokens below.
+------------------------------------------------------------------- */
+@theme {
+  --color-ink-950: #0a0f0e;
+  --color-ink-900: #0f1614;
+  --color-ink-850: #141d1a;
+  --color-ink-800: #192421;
+  --color-ink-700: #223029;
+  --color-ink-600: #2f4139;
+
+  --color-mist-50: #f2f7f4;
+  --color-mist-100: #e4ede8;
+  --color-mist-300: #b3c5bc;
+  --color-mist-400: #8ba398;
+  --color-mist-500: #6e8579;
+  --color-mist-600: #5b6f65;
+
+  --color-ember-300: #ffb489;
+  --color-ember-400: #f78c56;
+  --color-ember-500: #e8703a;
+  --color-ember-600: #c4552a;
+  --color-ember-700: #953f20;
+
+  --color-signal-400: #5fd3a3;
+  --color-signal-600: #2f8f68;
+
+  --color-alert-400: #f07a72;
+  --color-alert-500: #e0574f;
+
+  --radius-bubble: 1.35rem;
+  --animate-bubble-in: bubble-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 :root {
+  --app-font-sans: var(--font-geist-sans);
+  --app-font-display: var(--font-geist-sans);
   --radius: 0.75rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -77,6 +155,15 @@
   --sidebar-accent-foreground: oklch(0.205 0.042 286.38);
   --sidebar-border: oklch(0.92 0.003 286);
   --sidebar-ring: oklch(0.585 0.233 277.12);
+  --success: oklch(0.696 0.17 162.48);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.769 0.188 69.89);
+  --warning-foreground: oklch(0.205 0.042 286.38);
+  --info: oklch(0.633 0.18 204.55);
+  --info-foreground: oklch(0.985 0 0);
+  /* Full-bleed media surfaces (call stage) stay dark in every theme. */
+  --immersive: oklch(0.145 0 0);
+  --immersive-warning: oklch(0.828 0.189 84.43);
 }
 
 .dark {
@@ -112,6 +199,112 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0.014 288.38);
   --sidebar-ring: oklch(0.73 0.208 284.29);
+  --success: oklch(0.765 0.177 163.22);
+  --success-foreground: oklch(0.205 0.042 286.38);
+  --warning: oklch(0.828 0.189 84.43);
+  --warning-foreground: oklch(0.205 0.042 286.38);
+  --info: oklch(0.696 0.17 196.84);
+  --info-foreground: oklch(0.205 0.042 286.38);
+  --immersive: oklch(0.145 0 0);
+  --immersive-warning: oklch(0.828 0.189 84.43);
+}
+
+/* ------------------------------------------------------------------
+   Interface: Ember
+   A second skin, selected from Settings -> Appearance. It rebinds the
+   same semantic tokens the components already consume, so no component
+   needs to know which interface is active. Ember is dark-first: the
+   light variant keeps the copper accent over warm paper surfaces.
+------------------------------------------------------------------- */
+[data-skin="ember"] {
+  --app-font-sans: var(--font-manrope), var(--font-geist-sans);
+  --app-font-display: var(--font-bricolage), var(--font-geist-sans);
+
+  --radius: 1rem;
+
+  --background: #f6f8f6;
+  --foreground: #101a17;
+  --card: #ffffff;
+  --card-foreground: #101a17;
+  --popover: #ffffff;
+  --popover-foreground: #101a17;
+  --primary: #c4552a;
+  --primary-foreground: #fff6f0;
+  --secondary: #e8eeea;
+  --secondary-foreground: #1d2b26;
+  --muted: #e8eeea;
+  --muted-foreground: #5b6f65;
+  --accent: #e8eeea;
+  --accent-foreground: #1d2b26;
+  --destructive: #d8483f;
+  --destructive-foreground: #fff5f4;
+  --border: #d5e0da;
+  --input: #d5e0da;
+  --ring: #c4552a;
+  --chart-1: #e8703a;
+  --chart-2: #2f8f68;
+  --chart-3: #c4552a;
+  --chart-4: #8ba398;
+  --chart-5: #953f20;
+  --sidebar: #eef3f0;
+  --sidebar-foreground: #101a17;
+  --sidebar-primary: #c4552a;
+  --sidebar-primary-foreground: #fff6f0;
+  --sidebar-accent: #dfe8e3;
+  --sidebar-accent-foreground: #1d2b26;
+  --sidebar-border: #d5e0da;
+  --sidebar-ring: #c4552a;
+  --success: #2f8f68;
+  --success-foreground: #f2f7f4;
+  --warning: #c4552a;
+  --warning-foreground: #fff6f0;
+  --info: #2f8f68;
+  --info-foreground: #f2f7f4;
+  --immersive: #0a0f0e;
+  --immersive-warning: #f78c56;
+}
+
+[data-skin="ember"].dark {
+  --background: #0a0f0e;
+  --foreground: #e4ede8;
+  --card: #0f1614;
+  --card-foreground: #e4ede8;
+  --popover: #0f1614;
+  --popover-foreground: #e4ede8;
+  --primary: #e8703a;
+  --primary-foreground: #0a0f0e;
+  --secondary: #192421;
+  --secondary-foreground: #e4ede8;
+  --muted: #141d1a;
+  --muted-foreground: #8ba398;
+  --accent: #192421;
+  --accent-foreground: #f2f7f4;
+  --destructive: #e0574f;
+  --destructive-foreground: #0a0f0e;
+  --border: #223029;
+  --input: #223029;
+  --ring: #e8703a;
+  --chart-1: #e8703a;
+  --chart-2: #5fd3a3;
+  --chart-3: #ffb489;
+  --chart-4: #8ba398;
+  --chart-5: #c4552a;
+  --sidebar: #0f1614;
+  --sidebar-foreground: #e4ede8;
+  --sidebar-primary: #e8703a;
+  --sidebar-primary-foreground: #0a0f0e;
+  --sidebar-accent: #192421;
+  --sidebar-accent-foreground: #f2f7f4;
+  --sidebar-border: #223029;
+  --sidebar-ring: #e8703a;
+  --success: #5fd3a3;
+  --success-foreground: #0a0f0e;
+  --warning: #f78c56;
+  --warning-foreground: #0a0f0e;
+  --info: #5fd3a3;
+  --info-foreground: #0a0f0e;
+  --immersive: #0a0f0e;
+  --immersive-warning: #f78c56;
 }
 
 @layer base {
@@ -122,6 +315,15 @@
     @apply bg-background text-foreground;
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
+  }
+  /* Ember pairs a display face with the body face; the default interface
+     uses a single family, so the rule is scoped to the skin. */
+  [data-skin="ember"] h1,
+  [data-skin="ember"] h2,
+  [data-skin="ember"] h3,
+  [data-skin="ember"] h4 {
+    font-family: var(--app-font-display);
+    letter-spacing: -0.015em;
   }
 }
 

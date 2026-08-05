@@ -61,6 +61,7 @@ yarn.lock
 
 # test artifacts
 socket-test.cjs
+workspace.zip
 
 # expo / react native (mobile/)
 mobile/node_modules/

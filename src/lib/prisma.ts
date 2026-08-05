@@ -6,8 +6,14 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
-  return new PrismaClient({ adapter })
+  const url = process.env.DATABASE_URL!
+  // Neon's HTTP driver is only used for Neon connection strings;
+  // any other Postgres (local, Docker, VPS) uses the standard TCP driver.
+  if (url.includes("neon.tech")) {
+    const adapter = new PrismaNeon({ connectionString: url })
+    return new PrismaClient({ adapter })
+  }
+  return new PrismaClient()
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()

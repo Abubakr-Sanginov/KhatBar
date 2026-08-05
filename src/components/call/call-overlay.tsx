@@ -123,7 +123,7 @@ export function CallOverlay() {
                   animate={{ scale: [1, 1.08, 1] }}
                   transition={{ repeat: Infinity, duration: 1.4 }}
                   onClick={acceptCall}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-success text-success-foreground transition-colors hover:opacity-90"
                   aria-label="Accept call"
                 >
                   {isVideo ? <Video className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
@@ -142,7 +142,7 @@ export function CallOverlay() {
             exit={{ opacity: 0, y: 12 }}
             className="fixed bottom-20 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-2xl border bg-card px-4 py-2.5 shadow-premium-lg sm:bottom-[88px]"
           >
-            <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+            <span className="flex h-2 w-2 shrink-0 rounded-full bg-success" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{title}</p>
               <p className="text-xs text-muted-foreground">
@@ -168,7 +168,7 @@ export function CallOverlay() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-x-0 top-0 bottom-0 z-[60] flex flex-col bg-neutral-950 sm:bottom-[72px]"
+            className="fixed inset-x-0 top-0 bottom-0 z-[60] flex flex-col bg-immersive sm:bottom-[72px]"
           >
             <div className="shrink-0 flex items-center justify-between px-5 py-4">
               <div className="min-w-0">
@@ -193,13 +193,13 @@ export function CallOverlay() {
               </Button>
             </div>
 
-            {error && <p className="px-5 pb-2 text-center text-xs text-amber-400">{error}</p>}
+            {error && <p className="px-5 pb-2 text-center text-xs text-immersive-warning">{error}</p>}
 
             <div className="relative min-h-0 flex-1 px-4 pb-28">
               {isScreenSharing && localStream ? (
                 <div className="relative h-full overflow-hidden rounded-2xl border border-white/15 bg-black">
                   <CallVideo stream={localStream} muted className="object-contain" />
-                  <span className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-3 py-1.5 text-xs font-medium text-white shadow">
+                  <span className="absolute left-3 top-3 rounded-full bg-success/90 px-3 py-1.5 text-xs font-medium text-success-foreground shadow">
                     You are sharing your screen
                   </span>
                 </div>
@@ -220,7 +220,7 @@ export function CallOverlay() {
               )}
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center justify-center gap-3 bg-gradient-to-t from-neutral-950 via-neutral-950/95 to-transparent pb-4 pt-10">
+            <div className="absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center justify-center gap-3 bg-gradient-to-t from-immersive via-immersive/95 to-transparent pb-4 pt-10">
               <Button
                 variant={isMicOn ? "secondary" : "destructive"}
                 size="icon"

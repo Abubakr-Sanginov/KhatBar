@@ -12,13 +12,16 @@ import {
 } from "react-native";
 import { useChatStore } from "../../stores/chat-store";
 import { useAuthStore } from "../../stores/auth-store";
-import { Colors } from "../../theme/colors";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
+import type { ThemeColors } from "../../theme/colors";
 import { formatTime, displayName, getInitials } from "../../lib/utils";
 import type { Chat, Message } from "../../types";
 
 type ChatItem = Chat & { lastMessage?: Message | null; unreadCount: number };
 
 function ChatAvatar({ chat }: { chat: Chat }) {
+  const styles = useThemedStyles(makeStyles);
+
   if (chat.avatarUrl) {
     return <Image source={{ uri: chat.avatarUrl }} style={styles.avatar} />;
   }
@@ -38,6 +41,7 @@ function ChatListItem({
   chat: ChatItem;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const lastMsg = chat.lastMessage;
   const preview = lastMsg
     ? lastMsg.isDeleted
@@ -91,6 +95,8 @@ function ChatListItem({
 export default function ChatListScreen({ navigation }: any) {
   const { chats, isLoading, isRefreshing, fetchChats, refreshChats } = useChatStore();
   const user = useAuthStore((s) => s.user);
+  const colors = useThemeColors();
+  const styles = useThemedStyles(makeStyles);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Chat[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -131,7 +137,7 @@ export default function ChatListScreen({ navigation }: any) {
         <TextInput
           style={styles.searchInput}
           placeholder="Search chats..."
-          placeholderTextColor={Colors.dark.muted}
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={handleSearch}
           autoCapitalize="none"
@@ -151,7 +157,7 @@ export default function ChatListScreen({ navigation }: any) {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refreshChats}
-            tintColor={Colors.dark.primary}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
@@ -181,135 +187,136 @@ export default function ChatListScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 12,
-    backgroundColor: Colors.dark.background,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: Colors.dark.text,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  searchInput: {
-    backgroundColor: Colors.dark.inputBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.dark.text,
-  },
-  chatItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    marginRight: 12,
-  },
-  avatarFallback: {
-    backgroundColor: Colors.dark.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.dark.text,
-    flex: 1,
-  },
-  chatTime: {
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-    marginLeft: 8,
-  },
-  chatFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  chatPreview: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-    flex: 1,
-  },
-  badge: {
-    backgroundColor: Colors.dark.primary,
-    borderRadius: 12,
-    minWidth: 22,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-    marginLeft: 8,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  empty: {
-    alignItems: "center",
-    marginTop: 80,
-  },
-  emptyText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 16,
-  },
-  emptyHint: {
-    color: Colors.dark.muted,
-    fontSize: 14,
-    marginTop: 8,
-  },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.dark.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  fabText: {
-    color: "#fff",
-    fontSize: 28,
-    lineHeight: 30,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 12,
+      backgroundColor: colors.background,
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: colors.text,
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    searchInput: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: colors.text,
+    },
+    chatItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    avatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      marginRight: 12,
+    },
+    avatarFallback: {
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: {
+      color: colors.onPrimary,
+      fontSize: 18,
+      fontWeight: "600",
+    },
+    chatContent: {
+      flex: 1,
+    },
+    chatHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    chatName: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+      flex: 1,
+    },
+    chatTime: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginLeft: 8,
+    },
+    chatFooter: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    chatPreview: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    badge: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      minWidth: 22,
+      height: 22,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 6,
+      marginLeft: 8,
+    },
+    badgeText: {
+      color: colors.onPrimary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    empty: {
+      alignItems: "center",
+      marginTop: 80,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+    },
+    emptyHint: {
+      color: colors.muted,
+      fontSize: 14,
+      marginTop: 8,
+    },
+    fab: {
+      position: "absolute",
+      right: 20,
+      bottom: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+    fabText: {
+      color: colors.onPrimary,
+      fontSize: 28,
+      lineHeight: 30,
+    },
+  });

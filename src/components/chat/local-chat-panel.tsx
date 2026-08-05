@@ -54,7 +54,7 @@ export function LocalChatPanel() {
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
               {peer?.online ? (
                 <>
-                  <Wifi className="h-3 w-3 text-green-500" /> local • online
+                  <Wifi className="h-3 w-3 text-success" /> local • online
                 </>
               ) : (
                 <>

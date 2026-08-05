@@ -362,7 +362,7 @@ export default function AdminPage() {
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-medium",
                     r.status === "OPEN" ? "bg-destructive/10 text-destructive"
-                    : r.status === "RESOLVED" ? "bg-emerald-500/10 text-emerald-500"
+                    : r.status === "RESOLVED" ? "bg-success/15 text-success"
                     : "bg-muted text-muted-foreground",
                   )}
                 >
