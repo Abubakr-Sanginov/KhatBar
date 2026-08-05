@@ -194,6 +194,33 @@ docker compose down -v       # stop and wipe volumes for a fresh start
 
 ---
 
+## Deploy to Railway (recommended)
+
+Railway supports WebSocket (Socket.IO), unlike Vercel's serverless functions.
+
+1. Push your repo to GitHub.
+2. Go to https://railway.app and create a new project from your GitHub repo.
+3. Add a **PostgreSQL** service in Railway (or use an external Neon/Supabase database).
+4. Set the environment variable `DATABASE_URL` to the PostgreSQL connection string
+   (Railway provides this automatically if you added the PostgreSQL plugin).
+5. Railway auto-detects Node.js. The build runs `npm run build` which includes
+   `prisma generate` followed by `next build`. The start command is `npm run start`.
+6. After deployment, Railway gives you a public URL. Set this URL in `mobile/.env`:
+
+```
+EXPO_PUBLIC_API_URL=https://your-app.up.railway.app
+```
+
+That is it. Socket.IO, WebRTC signaling, and all real-time features work out of the box
+because Railway runs a persistent process, not serverless functions.
+
+**Note on Vercel:** Vercel can host the Next.js frontend, but its serverless runtime
+does not support long-lived WebSocket connections. Real-time messaging, typing
+indicators, and call signaling (Socket.IO) will not work. Use Railway, a VPS, or
+Docker for a full-stack deployment.
+
+---
+
 ## Manual setup
 
 Prerequisites: Node.js 22.13 or newer, a PostgreSQL instance (local, Neon, or other),
