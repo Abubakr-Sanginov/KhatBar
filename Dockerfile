@@ -45,4 +45,4 @@ RUN chown -R nextjs:nodejs /app
 USER nextjs
 
 # apply the schema on boot (idempotent) then start the custom server
-CMD ["sh", "-c", "npx prisma db push && node_modules/.bin/tsx server.ts"]
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then npx prisma db push; fi && node_modules/.bin/tsx server.ts"]
