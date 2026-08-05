@@ -175,7 +175,7 @@ function MessageBubble({
 }
 
 export function MessagePanel() {
-  const { activeChat, chats, messages, setMessages, addMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
+  const { activeChat, chats, messages, setMessages, prependMessages, addMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
   const { toggleInfoPanel } = useUIStore()
   const { user } = useAuth()
   const { isConnected, emit, on } = useSocket()
@@ -194,22 +194,47 @@ export function MessagePanel() {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const chatId = activeChat?.id
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   useEffect(() => {
     if (!chatId) return
     let cancelled = false
-    fetch(`/api/messages?chatId=${chatId}`)
+    fetch(`/api/messages?chatId=${chatId}&limit=50`)
       .then((r) => r.json())
       .then(async (data) => {
         if (cancelled || !data.messages || !activeChat || !user?.id) return
         const decrypted = await decryptPrivateChatMessages(activeChat, user.id, data.messages)
-        if (!cancelled) setMessages(chatId, decrypted)
+        if (!cancelled) {
+          setMessages(chatId, decrypted)
+          setHasMore(Boolean(data.nextCursor))
+        }
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [chatId, activeChat, setMessages, user?.id])
+
+  async function loadOlder() {
+    if (!chatId || loadingOlder) return
+    const firstId = (messages[chatId] || [])[0]?.id
+    if (!firstId) return
+    setLoadingOlder(true)
+    try {
+      const res = await fetch(`/api/messages?chatId=${chatId}&limit=50&cursor=${encodeURIComponent(firstId)}`)
+      const data = await res.json()
+      const msgs = data.messages || []
+      if (activeChat && user?.id) {
+        const decrypted = await decryptPrivateChatMessages(activeChat, user.id, msgs)
+        if (decrypted.length) prependMessages(chatId, decrypted)
+      }
+      setHasMore(Boolean(data.nextCursor))
+    } catch {
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   useEffect(() => {
     if (!chatId) return
@@ -516,6 +541,23 @@ export function MessagePanel() {
             data={chatMessages}
             followOutput="smooth"
             initialTopMostItemIndex={chatMessages.length - 1}
+            startReached={hasMore ? loadOlder : undefined}
+            components={{
+              Header: () => (
+                <div className="h-4">
+                  {hasMore && (
+                    <div className="flex items-center justify-center py-1">
+                      {loadingOlder ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Scroll up for older messages</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ),
+              Footer: () => <div className="h-4" />,
+            }}
             itemContent={(index) => {
               const msg = chatMessages[index]
               const isMine = msg.senderId === user?.id
@@ -548,10 +590,6 @@ export function MessagePanel() {
                   onToggleSelection={() => toggleSelect(msg.id)}
                 />
               )
-            }}
-            components={{
-              Header: () => <div className="h-4" />,
-              Footer: () => <div className="h-4" />,
             }}
           />
         )}

@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Chat, Message, ChatMember } from "../types";
 import { chatsApi } from "../api/chats";
 import type { CreateChatInput } from "../api/chats";
@@ -29,11 +31,13 @@ interface ChatState {
   removeMember: (chatId: string, userId: string) => Promise<void>;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  chats: [],
-  activeChat: null,
-  isLoading: false,
-  isRefreshing: false,
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      chats: [],
+      activeChat: null,
+      isLoading: false,
+      isRefreshing: false,
 
   fetchChats: async () => {
     set({ isLoading: true });
@@ -134,4 +138,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const updated = await chatsApi.get(chatId);
     set({ activeChat: updated.chat });
   },
-}));
+    }),
+    {
+      name: "khatbar_chats",
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (s) => ({ chats: s.chats }),
+    }
+  )
+);

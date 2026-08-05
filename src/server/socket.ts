@@ -105,6 +105,40 @@ interface CallSession {
 const calls = new Map<string, CallSession>()
 const userCalls = new Map<string, Set<string>>()
 
+// --- per-socket rate limiting -------------------------------------------------
+const MSG_BUDGET_MS = 10_000
+const MSG_BUDGET_LIMIT = 20
+const SIGNAL_BUDGET_MS = 1_000
+const SIGNAL_BUDGET_LIMIT = 60
+const buckets = new Map<string, { messages: number[]; signals: number[] }>()
+
+function allow(socketId: string, kind: "messages" | "signals", budgetMs: number, limit: number): boolean {
+  let bucket = buckets.get(socketId)
+  if (!bucket) {
+    bucket = { messages: [], signals: [] }
+    buckets.set(socketId, bucket)
+  }
+  const now = Date.now()
+  const window = bucket[kind]
+  while (window.length && window[0] <= now - budgetMs) window.shift()
+  if (window.length >= limit) return false
+  window.push(now)
+  return true
+}
+
+function allowMessage(socketId: string) {
+  return allow(socketId, "messages", MSG_BUDGET_MS, MSG_BUDGET_LIMIT)
+}
+
+function allowSignal(socketId: string) {
+  return allow(socketId, "signals", SIGNAL_BUDGET_MS, SIGNAL_BUDGET_LIMIT)
+}
+
+// Clean up buckets when a socket leaves so memory cannot grow unbounded.
+function releaseBucket(socketId: string) {
+  buckets.delete(socketId)
+}
+
 function callPeer(u: CallPeer): CallPeer {
   return { id: u.id, username: u.username, displayName: u.displayName, avatarUrl: u.avatarUrl }
 }
@@ -348,6 +382,7 @@ function registerCallHandlers(socket: AuthedSocket) {
   })
 
   socket.on("call:signal", (data: { callId: string; targetId: string; payload: unknown }) => {
+    if (!allowSignal(socket.id)) return
     const session = calls.get(data?.callId)
     if (!session || !data?.targetId) return
     // Accept signals from anyone attached to the call, including a peer that is
@@ -417,6 +452,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>) {
     }
 
     socket.on("disconnect", async () => {
+      releaseBucket(socket.id)
       userSockets.get(userId)?.delete(socket.id)
       const stillOnline = (userSockets.get(userId)?.size ?? 0) > 0
       if (!stillOnline) {
@@ -472,6 +508,10 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>) {
 
     socket.on("message:send", async (data: { chatId: string; content: string; type?: string; mediaUrl?: string; replyToId?: string }) => {
       try {
+        if (!allowMessage(socket.id)) {
+          socket.emit("message:error", { chatId: data.chatId, error: "Rate limited: too many messages, slow down" })
+          return
+        }
         const membership = await getPrisma().chatMember.findUnique({
           where: { userId_chatId: { userId, chatId: data.chatId } },
           select: { role: true, chat: { select: { type: true, isPublic: true } } },

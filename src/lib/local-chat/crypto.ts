@@ -8,11 +8,14 @@
 
 const idb = () => globalThis.indexedDB as IDBFactory | undefined
 
-const KEY_STORE = "khatbar-local-keys"
+const KEY_DB_NAME = "khatbar-local-keys"
 // bumped so pre-existing DBs from earlier builds get the missing stores
 const KEY_DB_VERSION = 2
 
-const REQUIRED_STORES = ["keys", "shared"]
+const IDENTITY_STORE = "keys"
+const SHARED_STORE = "shared"
+
+const REQUIRED_STORES = [IDENTITY_STORE, SHARED_STORE]
 
 function dropDatabase(name: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -27,7 +30,7 @@ async function openKeyDb(): Promise<IDBDatabase> {
   const factory = idb()
   if (!factory) throw new Error("IndexedDB unavailable in this browser")
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const req = factory.open(KEY_STORE, KEY_DB_VERSION)
+    const req = factory.open(KEY_DB_NAME, KEY_DB_VERSION)
     req.onupgradeneeded = () => {
       for (const store of REQUIRED_STORES) {
         if (!req.result.objectStoreNames.contains(store)) {
@@ -41,7 +44,7 @@ async function openKeyDb(): Promise<IDBDatabase> {
   // A DB left behind by an even older build may still lack the stores.
   if (!REQUIRED_STORES.every((s) => db.objectStoreNames.contains(s))) {
     db.close()
-    await dropDatabase(KEY_STORE)
+    await dropDatabase(KEY_DB_NAME)
     return openKeyDb()
   }
   return db
@@ -91,13 +94,13 @@ export async function getOrCreateDeviceIdentity(): Promise<{
   publicKey: JsonWebKey
   privateKey: CryptoKey
 }> {
-  let deviceId = await getRecord<string>(KEY_STORE, DEVICE_ID_KEY)
+  let deviceId = await getRecord<string>(IDENTITY_STORE, DEVICE_ID_KEY)
   if (!deviceId) {
     deviceId = generateId()
-    await putRecord(KEY_STORE, DEVICE_ID_KEY, deviceId)
+    await putRecord(IDENTITY_STORE, DEVICE_ID_KEY, deviceId)
   }
   const existing = await getRecord<{ name: string; publicKey: JsonWebKey; privateKey: JsonWebKey }>(
-    KEY_STORE,
+    IDENTITY_STORE,
     IDENTITY_KEY,
   )
   if (existing) {
@@ -122,7 +125,7 @@ export async function getOrCreateDeviceIdentity(): Promise<{
     (typeof navigator !== "undefined" && navigator.language === "ru"
       ? "Локальное устройство"
       : "Local device") + " " + deviceId.slice(0, 4).toUpperCase()
-  await putRecord(KEY_STORE, IDENTITY_KEY, {
+  await putRecord(IDENTITY_STORE, IDENTITY_KEY, {
     name,
     publicKey: publicJwk as JsonWebKey,
     privateKey: privateJwk as JsonWebKey,
@@ -142,7 +145,7 @@ async function getSharedSecret(
   peerId: string,
 ): Promise<CryptoKey> {
   const cacheKey = SHARED_PREFIX + peerId
-  const cached = await getRecord<JsonWebKey>(KEY_STORE, cacheKey)
+  const cached = await getRecord<JsonWebKey>(SHARED_STORE, cacheKey)
   if (cached) {
     return crypto.subtle.importKey(
       "jwk",
@@ -169,7 +172,7 @@ async function getSharedSecret(
     ["encrypt", "decrypt"],
   )
   const jwk = await crypto.subtle.exportKey("jwk", raw as CryptoKey)
-  await putRecord(KEY_STORE, cacheKey, jwk as JsonWebKey)
+  await putRecord(SHARED_STORE, cacheKey, jwk as JsonWebKey)
   return raw as CryptoKey
 }
 

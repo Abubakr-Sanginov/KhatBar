@@ -18,20 +18,30 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- runtime ------------------------------------------------------------
-FROM base AS runner
+FROM node:22-alpine AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
-COPY --from=builder /app/node_modules ./node_modules
+# run as non-root (mirrors the official nextjs Docker example)
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+# production-only deps are enough: tsx, socket.io, prisma, next are all in dependencies
+COPY --from=builder /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev
+
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/next.config.* ./
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/server.ts ./server.ts
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/next.config.* ./
+
+RUN chown -R nextjs:nodejs /app
+USER nextjs
 
 # apply the schema on boot (idempotent) then start the custom server
 CMD ["sh", "-c", "npx prisma db push --skip-generate && node_modules/.bin/tsx server.ts"]

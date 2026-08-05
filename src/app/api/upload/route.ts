@@ -17,6 +17,33 @@ const ALLOWED_TYPES: Record<string, string> = {
   "application/pdf": ".pdf",
 }
 
+/** Minimal magic-byte validation so a claimed MIME cannot be spoofed. */
+function matchesSignature(mime: string, buf: Uint8Array): boolean {
+  const sig = (bytes: number[]) =>
+    bytes.every((b, i) => buf[i] === b)
+  switch (mime) {
+    case "image/jpeg":
+      return buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+    case "image/png":
+      return sig([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    case "image/webp":
+      return sig([0x52, 0x49, 0x46, 0x46]) && sig([0x57, 0x45, 0x42, 0x50])
+    case "image/gif":
+      return sig([0x47, 0x49, 0x46, 0x38]) // GIF8
+    case "audio/webm":
+    case "video/webm":
+      return sig([0x1a, 0x45, 0xdf, 0xa3])
+    case "video/mp4":
+      return sig([0x00, 0x00, 0x00]) && (buf[4] === 0x66 || buf[4] === 0x6d || buf[4] === 0x69 || buf[4] === 0x6d) // ftyp/moov
+    case "audio/mpeg":
+      return buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0
+    case "application/pdf":
+      return sig([0x25, 0x50, 0x44, 0x46]) // %PDF
+    default:
+      return true
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get("cookie")?.match(/session_token=([^;]+)/)?.[1]
@@ -44,6 +71,9 @@ export async function POST(req: NextRequest) {
     const dir = path.join(process.cwd(), "public", "uploads")
     await mkdir(dir, { recursive: true })
     const buffer = Buffer.from(await file.arrayBuffer())
+    if (!matchesSignature(file.type, new Uint8Array(buffer.subarray(0, 16)))) {
+      return NextResponse.json({ error: "File content does not match its type" }, { status: 400 })
+    }
     await writeFile(path.join(dir, filename), buffer)
 
     return NextResponse.json({ url: `/uploads/${filename}` })

@@ -309,6 +309,35 @@ ciphertext.
 
 ---
 
+## Security and privacy audit disclaimer
+
+KhatBar is a learning project and has NOT been reviewed by a professional
+security auditor. It is fine for personal use; it is NOT ready for production
+data you cannot afford to lose. Known limitations, in order of severity:
+
+| Area | Current state | Gap / roadmap |
+|---|---|---|
+| Key pinning | Public keys are fetched from the server, no fingerprint UI | Show a fingerprint in the chat profile and verify it out-of-band (TOFU-style or manual comparison) |
+| Forward secrecy | Static ECDH keys; a compromised long-term key decrypts old chats | Ephemeral per-session DH or a Double Ratchet; re-derive keys periodically |
+| Pairing (local chat) | 8-character code + WebRTC SDP exchange on the same network | Add SAS (short authentication string) comparison during pairing |
+| Local key storage (web) | Private keys sit unencrypted in IndexedDB | PBKDF2-derived passphrase to encrypt the private key at rest |
+| Call relay | STUN only by default, TURN optional via env | Configure `NEXT_PUBLIC_TURN_*` for symmetric NATs; SFU (LiveKit/Mediasoup) for 3+ participant groups |
+| Message spam | Socket rate limiting is in place | Webhook-based abuse detection, CAPTCHA on registration |
+| Socket.IO scaling | Single-instance in-memory adapter | `@socket.io/redis-adapter` for horizontal scaling |
+| DB pooling | Prisma direct pool | PgBouncer or a serverless pooler for many concurrent connections |
+| Uploads | Magic-byte checks, SVG excluded | S3/MinIO object storage, image re-encoding, malware scanning |
+| Push notifications | None; calls and chats only work while the app is open | APNs / FCM via expo-notifications |
+
+**Key lifecycle.** Identity keypairs live in the browser (WebCrypto, non-extractable)
+or SecureStore (mobile). The private half never leaves the device. When a user
+clears site data or reinstalls, new keys are generated and past chats in private
+conversations become undecryptable by design.
+
+**Reporting.** Found a bug or a security issue? Open a GitHub issue. Do not
+include real credentials or keys in reports.
+
+---
+
 ## Tech stack
 
 | Layer | Web | Mobile |
