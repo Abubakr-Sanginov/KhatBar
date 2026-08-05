@@ -1,16 +1,22 @@
 import React, { useEffect } from "react";
-import { Appearance } from "react-native";
+import { Appearance, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { install } from "react-native-quick-crypto";
-import { registerGlobals } from "react-native-webrtc";
 import AppNavigator from "./src/navigation";
 import { useThemeStore } from "./src/stores/theme-store";
 
-// Patches global.crypto / global.Buffer. Must run before any e2ee code.
-install();
-// Patches global RTCPeerConnection, mediaDevices, MediaStream, etc.
-registerGlobals();
+// react-native-quick-crypto and react-native-webrtc require a dev client build,
+// not Expo Go. Conditionally install so the app still loads in Expo Go.
+if (Platform.OS !== "web") {
+  try {
+    const { install } = require("react-native-quick-crypto");
+    install();
+  } catch {}
+  try {
+    const { registerGlobals } = require("react-native-webrtc");
+    registerGlobals();
+  } catch {}
+}
 
 export default function App() {
   const mode = useThemeStore((s) => s.mode);

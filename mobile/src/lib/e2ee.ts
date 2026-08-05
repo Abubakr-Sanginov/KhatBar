@@ -1,7 +1,20 @@
 import * as SecureStore from "expo-secure-store";
-import { subtle, getRandomValues } from "react-native-quick-crypto";
-import type { CryptoKey as QuickCryptoKey } from "react-native-quick-crypto";
 import type { Chat, Message } from "../types";
+
+// react-native-quick-crypto requires a dev client build (not Expo Go).
+// Fall back to the global crypto object when the native module is unavailable.
+// Use `any` for the types since SubtleCrypto/CryptoKey may not exist in RN.
+let subtle: any;
+let getRandomValues: <T extends ArrayBufferView>(array: T) => T;
+try {
+  const qc = require("react-native-quick-crypto");
+  subtle = qc.subtle;
+  getRandomValues = qc.getRandomValues;
+} catch {
+  const g = globalThis.crypto ?? (globalThis as any);
+  subtle = g.subtle;
+  getRandomValues = (arr: any) => g.getRandomValues(arr);
+}
 
 /** E2EE for 1:1 private chats and closed groups.
  *
@@ -114,8 +127,8 @@ export async function ensureIdentityKeys(): Promise<{ publicKey: string; private
 
   // Exported as JWK because that is the format the server validates and the
   // web client publishes; raw/pkcs8 would not interoperate.
-  const publicKey = JSON.stringify(await subtle.exportKey("jwk", pair.publicKey as QuickCryptoKey));
-  const privateKey = JSON.stringify(await subtle.exportKey("jwk", pair.privateKey as QuickCryptoKey));
+  const publicKey = JSON.stringify(await subtle.exportKey("jwk", pair.publicKey as any));
+  const privateKey = JSON.stringify(await subtle.exportKey("jwk", pair.privateKey as any));
 
   await SecureStore.setItemAsync(PRIVATE_KEY_TAG, privateKey);
   await SecureStore.setItemAsync(PUBLIC_KEY_TAG, publicKey);
@@ -138,14 +151,14 @@ export async function clearIdentityKeys(): Promise<void> {
   ]);
 }
 
-async function loadPrivateKey(): Promise<QuickCryptoKey> {
+async function loadPrivateKey(): Promise<any> {
   const jwk = await SecureStore.getItemAsync(PRIVATE_KEY_TAG);
   if (!jwk) throw new Error("Private encryption key is unavailable on this device");
   return subtle.importKey("jwk", JSON.parse(jwk), ECDH, false, ["deriveBits", "deriveKey"]);
 }
 
 /** ECDH with the peer, then HKDF to an AES-GCM key bound to this chat's salt. */
-async function chatKey(peerPublicKey: string, salt: string): Promise<QuickCryptoKey> {
+async function chatKey(peerPublicKey: string, salt: string): Promise<any> {
   const privateKey = await loadPrivateKey();
   const peer = await subtle.importKey("jwk", JSON.parse(peerPublicKey), ECDH, false, []);
   const shared = await subtle.deriveBits({ name: "ECDH", public: peer }, privateKey, 256);
@@ -159,7 +172,7 @@ async function chatKey(peerPublicKey: string, salt: string): Promise<QuickCrypto
   );
 }
 
-async function encryptWithKey(key: QuickCryptoKey, plaintext: Uint8Array): Promise<string> {
+async function encryptWithKey(key: any, plaintext: Uint8Array): Promise<string> {
   const iv = randomBytes(12);
   const ciphertext = await subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
   return JSON.stringify({
@@ -169,7 +182,7 @@ async function encryptWithKey(key: QuickCryptoKey, plaintext: Uint8Array): Promi
   } satisfies EncryptedEnvelope);
 }
 
-async function decryptWithKey(key: QuickCryptoKey, encoded: string): Promise<Uint8Array> {
+async function decryptWithKey(key: any, encoded: string): Promise<Uint8Array> {
   const envelope = JSON.parse(encoded) as EncryptedEnvelope;
   if (envelope.v !== 1 || !envelope.iv || !envelope.ciphertext) {
     throw new Error("Invalid encrypted message");
@@ -234,7 +247,7 @@ function isPrivateGroup(chat: Chat) {
   return chat.type === "GROUP" && !chat.isPublic && Boolean(chat.encryptionSalt);
 }
 
-async function privateGroupKey(chat: Chat, userId: string): Promise<QuickCryptoKey> {
+async function privateGroupKey(chat: Chat, userId: string): Promise<any> {
   if (!isPrivateGroup(chat) || !chat.encryptionSalt || !chat.ownerId) {
     throw new Error("This private group has not been encrypted yet");
   }
