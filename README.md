@@ -221,6 +221,31 @@ Docker for a full-stack deployment.
 
 ---
 
+## Deploy to Render
+
+Render supports WebSocket (Socket.IO) and provides a free tier.
+
+1. Push your repo to GitHub.
+2. Go to https://render.com and create a new **Web Service** from your repo.
+3. Settings:
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm run start`
+   - **Node version:** 22 (or latest)
+4. Add a PostgreSQL database (Render's free PostgreSQL or external Neon/Supabase).
+   Set `DATABASE_URL` in the web service's environment variables.
+5. After deployment, Render gives you a public URL like `https://xxx.onrender.com`.
+   Set this in `mobile/.env`:
+
+```
+EXPO_PUBLIC_API_URL=https://xxx.onrender.com
+```
+
+**Note:** Render's free tier spins down after 15 minutes of inactivity. The first
+request after spin-down takes ~30 seconds (cold start). Socket.IO reconnects
+automatically once the service is awake. For always-on, use the paid tier ($7/month).
+
+---
+
 ## Manual setup
 
 Prerequisites: Node.js 22.13 or newer, a PostgreSQL instance (local, Neon, or other),
