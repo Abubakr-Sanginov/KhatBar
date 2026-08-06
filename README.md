@@ -8,6 +8,10 @@ Real-time messaging, voice and video calls, screen sharing, public and private g
 channels, and a device-to-device mode that works with no server at all.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-e8703a?style=for-the-badge)](./LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](./CONTRIBUTING.md)
+[![Issues](https://img.shields.io/github/issues/Abubakr-Sanginov/KhatBar?style=for-the-badge)](https://github.com/Abubakr-Sanginov/KhatBar/issues)
+[![Stars](https://img.shields.io/github/stars/Abubakr-Sanginov/KhatBar?style=for-the-badge)](https://github.com/Abubakr-Sanginov/KhatBar/stargazers)
+
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo_SDK_57-000020?style=for-the-badge&logo=expo&logoColor=white)
@@ -16,49 +20,21 @@ channels, and a device-to-device mode that works with no server at all.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
 
-[Interfaces](#two-interfaces) &middot;
-[Features](#features) &middot;
-[Architecture](#architecture) &middot;
-[Quick start](#quick-start-with-docker) &middot;
-[Local chat](#local-chat-offline-and-end-to-end-encrypted) &middot;
-[License](#license)
+[Live Demo](https://khatbar.onrender.com) &middot;
+[Report Bug](https://github.com/Abubakr-Sanginov/KhatBar/issues/new?labels=bug) &middot;
+[Request Feature](https://github.com/Abubakr-Sanginov/KhatBar/issues/new?labels=enhancement)
 
 </div>
 
 ---
 
-## Two interfaces
+## Live Demo
 
-KhatBar ships with two complete visual interfaces. They are not themes bolted onto
-one design: each has its own palette, typography and surface treatment, and both
-expose every feature. The choice is yours, on every device, at any time.
+**Web:** [https://khatbar.onrender.com](https://khatbar.onrender.com)
 
-| | Aurora | Ember |
-|---|---|---|
-| Character | Neutral, system-native, quiet | Warm signal in the dark |
-| Surfaces | Greyscale cards on white or black | Green-shifted charcoal ink |
-| Accent | Violet on web, iOS blue on mobile | Copper, single accent throughout |
-| Typography | Geist | Bricolage Grotesque for headings, Manrope for body |
-| Best for | Blending into the host OS | Long sessions, low light, focus |
+**Mobile:** Set `EXPO_PUBLIC_API_URL=https://khatbar.onrender.com` in `mobile/.env` and run `npx expo start`.
 
-### Switching
-
-- **Web** &mdash; open the account menu in the sidebar, choose **Settings**, then pick an
-  interface under **Interface**. The change is instant, with no reload.
-- **Mobile** &mdash; open the **Settings** tab and pick an interface under **Interface**.
-
-Light, dark and system appearance are independent of the interface choice, so
-Aurora and Ember are each available in both modes. Both settings are stored per
-device (`localStorage` on web, `AsyncStorage` on mobile) and never leave it, so
-one account can look different on your laptop and your phone.
-
-Under the hood the two interfaces are one token set with two bindings. On the web
-a `data-skin` attribute on `<html>` rebinds the same semantic custom properties
-(`--background`, `--primary`, `--card`, and the rest) that every component already
-consumes, so no component knows which interface is active. On mobile the matching
-palettes live in [mobile/src/theme/colors.ts](mobile/src/theme/colors.ts) and reach
-screens through a `useThemedStyles(makeStyles)` hook that re-memoizes when the
-palette changes. Adding a third interface means adding one palette in each place.
+> **Note:** Render's free tier spins down after 15 minutes of inactivity. The first request after spin-down takes ~30 seconds (cold start).
 
 ---
 
@@ -86,14 +62,10 @@ palette changes. Adding a third interface means adding one palette in each place
 - Roles: owner, admin, moderator, member
 - Admin panel for users, chats, messages and report moderation
 
-### Security
-- Session-based auth (httpOnly cookies), SHA-256 password hashing
-- E2EE identity keys stored in IndexedDB (web) / SecureStore (mobile)
-- MIME-validated uploads, rate-limited APIs
-
 ### Interfaces
 - Two built-in interfaces: **Aurora** (default, neutral surfaces + violet accent) and **Ember** (dark-first "warm signal": ink surfaces, copper accent)
 - Switch any time from Settings - the choice is stored per device and applied before the first paint
+- Light, dark and system appearance are independent of the interface choice
 
 ---
 
@@ -122,46 +94,15 @@ palette changes. Adding a third interface means adding one palette in each place
                      +-----------------------+
 ```
 
-- One shared backend: both clients speak the same REST API and Socket.IO events.
-- WebRTC is a peer-to-peer mesh. Signaling goes through the server; media flows
-  directly between clients.
-- E2EE is wire-compatible across clients, so a web user and a mobile user can talk
-  in the same encrypted chat.
+- **One shared backend:** both clients speak the same REST API and Socket.IO events.
+- **WebRTC mesh:** signaling goes through the server; media flows directly between clients.
+- **Wire-compatible E2EE:** a web user and a mobile user can talk in the same encrypted chat.
 
 ---
 
-## Repository layout
+## Getting Started
 
-```
-+-- src/                    # Web app (Next.js)
-|   +-- app/api/            # REST endpoints (auth, chats, messages, uploads)
-|   +-- components/         # UI (chat, calls, dialogs, pickers, settings)
-|   +-- hooks/              # useAuth, useCall, useSocket
-|   +-- lib/                # e2ee.ts, webrtc.ts, socket-client.ts, skins.ts
-|   +-- lib/local-chat/     # offline E2EE: transport, crypto, sync, db
-|   +-- server/socket.ts    # Socket.IO server: messaging, presence, calls
-|   +-- stores/             # Zustand stores
-+-- prisma/schema.prisma    # Database schema
-+-- server.ts               # Custom HTTP + Socket.IO server entry
-+-- mobile/                 # Mobile app (Expo SDK 57)
-    +-- src/
-        +-- api/            # REST client and typed endpoints
-        +-- hooks/          # useSocket, useCall, useTheme
-        +-- lib/            # e2ee.ts (quick-crypto), utils
-        +-- navigation/     # Stack and tab navigators
-        +-- screens/        # auth, chat, call, settings
-        +-- socket/         # Socket.IO client
-        +-- stores/         # Zustand stores
-        +-- theme/          # Aurora and Ember palettes, interface metadata
-```
-
----
-
-## Quick start with Docker
-
-The fastest way to run the whole stack. Compose starts PostgreSQL and the app together.
-
-Prerequisites: Docker and Docker Compose v2.
+### Option 1: Docker (fastest)
 
 ```bash
 git clone https://github.com/Abubakr-Sanginov/KhatBar.git
@@ -171,125 +112,53 @@ docker compose up -d --build
 
 Open http://localhost:3000, register an account and start chatting.
 
-### Configuration
+### Option 2: Manual setup
 
-All settings live in the `env` section of `docker-compose.yml`.
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | postgres://khatbar:khatbar@db:5432/khatbar | PostgreSQL connection string, pre-wired to the compose database |
-| `NEXT_PUBLIC_WS_URL` | http://localhost:3000 | WebSocket origin, same as the web origin |
-| `NEXT_PUBLIC_APP_URL` | http://localhost:3000 | Public app origin |
-| `NEXT_PUBLIC_GIPHY_API_KEY` | empty | GIPHY integration, optional |
-| `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL` | empty | TURN relay for calls behind strict NAT |
-
-The app container runs Prisma migrations on startup, so the schema is applied for
-you. Uploads persist in the `uploads` volume and PostgreSQL data in `db-data`.
+**Prerequisites:** Node.js 22.13+, PostgreSQL (local, Neon, or other)
 
 ```bash
-docker compose logs -f app   # follow app logs
-docker compose down          # stop, keep data
-docker compose down -v       # stop and wipe volumes for a fresh start
-```
-
----
-
-## Deploy to Railway (recommended)
-
-Railway supports WebSocket (Socket.IO), unlike Vercel's serverless functions.
-
-1. Push your repo to GitHub.
-2. Go to https://railway.app and create a new project from your GitHub repo.
-3. Add a **PostgreSQL** service in Railway (or use an external Neon/Supabase database).
-4. Set the environment variable `DATABASE_URL` to the PostgreSQL connection string
-   (Railway provides this automatically if you added the PostgreSQL plugin).
-5. Railway auto-detects Node.js. The build runs `npm run build` which includes
-   `prisma generate` followed by `next build`. The start command is `npm run start`.
-6. After deployment, Railway gives you a public URL. Set this URL in `mobile/.env`:
-
-```
-EXPO_PUBLIC_API_URL=https://your-app.up.railway.app
-```
-
-That is it. Socket.IO, WebRTC signaling, and all real-time features work out of the box
-because Railway runs a persistent process, not serverless functions.
-
-**Note on Vercel:** Vercel can host the Next.js frontend, but its serverless runtime
-does not support long-lived WebSocket connections. Real-time messaging, typing
-indicators, and call signaling (Socket.IO) will not work. Use Railway, a VPS, or
-Docker for a full-stack deployment.
-
----
-
-## Deploy to Render
-
-Render supports WebSocket (Socket.IO) and provides a free tier.
-
-1. Push your repo to GitHub.
-2. Go to https://render.com and create a new **Web Service** from your repo.
-3. Settings:
-   - **Build Command:** `npm install && npm run build`
-   - **Start Command:** `npm run start`
-   - **Node version:** 22 (or latest)
-4. Add a PostgreSQL database (Render's free PostgreSQL or external Neon/Supabase).
-   Set `DATABASE_URL` in the web service's environment variables.
-5. After deployment, Render gives you a public URL like `https://xxx.onrender.com`.
-   Set this in `mobile/.env`:
-
-```
-EXPO_PUBLIC_API_URL=https://xxx.onrender.com
-```
-
-**Note:** Render's free tier spins down after 15 minutes of inactivity. The first
-request after spin-down takes ~30 seconds (cold start). Socket.IO reconnects
-automatically once the service is awake. For always-on, use the paid tier ($7/month).
-
----
-
-## Manual setup
-
-Prerequisites: Node.js 22.13 or newer, a PostgreSQL instance (local, Neon, or other),
-and Expo Go on a device or emulator for the mobile app.
-
-### 1. Web
-
-```bash
+git clone https://github.com/Abubakr-Sanginov/KhatBar.git
+cd KhatBar
 npm install
-
 cp .env.example .env
-#   set DATABASE_URL to your Postgres connection string
+# edit .env and set DATABASE_URL
 
 npx prisma db push
-npx prisma generate
-
-npm run dev            # custom server with Socket.IO on :3000
+npm run dev
 ```
 
-Open http://localhost:3000 and register an account.
+### Option 3: Deploy to Render
 
-### 2. Mobile (Expo SDK 57)
+1. Push your repo to GitHub
+2. Create a new **Web Service** on [render.com](https://render.com)
+3. Set environment variables:
+   - `DATABASE_URL` - PostgreSQL connection string
+   - `NODE_ENV` - production
+4. Deploy. Render will run `npm install && npm run build` and start with `npm run start`
+
+### Mobile app
 
 ```bash
 cd mobile
 npm install
-
 cp .env.example .env
-#   EXPO_PUBLIC_API_URL=http://192.168.1.10:3000
-#   use your machine's LAN IP, not localhost
+# edit .env and set EXPO_PUBLIC_API_URL (e.g., http://192.168.1.10:3000 or https://khatbar.onrender.com)
 
 npx expo start
 ```
 
-Scan the QR code with Expo Go on Android or the Camera app on iOS. The mobile app
-shares accounts, chats, messages and calls with the web app. Run both, sign in as
-two users, and try an encrypted chat or a video call.
+Scan the QR code with Expo Go on Android or the Camera app on iOS.
 
-### Environment variables
+> **Note:** For full functionality (E2EE, WebRTC calls), build a development client with `npx expo run:android` or `npx expo run:ios`. Expo Go works for messaging but not for native modules.
+
+---
+
+## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `NEXT_PUBLIC_WS_URL` | Yes | WebSocket origin, same as the web origin |
+| `NEXT_PUBLIC_WS_URL` | Yes | WebSocket origin (same as web origin) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public app origin |
 | `NEXT_PUBLIC_GIPHY_API_KEY` | No | GIPHY integration |
 | `NEXT_PUBLIC_TURN_URL` / `_USERNAME` / `_CREDENTIAL` | No | TURN relay for calls behind strict NAT |
@@ -299,10 +168,53 @@ Never commit real `.env` files; they are git-ignored. Commit only `.env.example`
 
 ---
 
-## Local chat (offline and end-to-end encrypted)
+## Repository Layout
+
+```
+src/                        # Web app (Next.js)
+  app/api/                  # REST endpoints (auth, chats, messages, uploads)
+  components/               # UI (chat, calls, dialogs, pickers, settings)
+  hooks/                    # useAuth, useCall, useSocket
+  lib/                      # e2ee.ts, webrtc.ts, socket-client.ts, skins.ts
+  lib/local-chat/           # offline E2EE: transport, crypto, sync, db
+  server/socket.ts          # Socket.IO server: messaging, presence, calls
+  stores/                   # Zustand stores
+prisma/schema.prisma        # Database schema
+server.ts                   # Custom HTTP + Socket.IO server entry
+mobile/                     # Mobile app (Expo SDK 57)
+  src/
+    api/                    # REST client and typed endpoints
+    hooks/                  # useSocket, useCall, useTheme
+    lib/                    # e2ee.ts (quick-crypto), utils
+    navigation/             # Stack and tab navigators
+    screens/                # auth, chat, call, settings
+    socket/                 # Socket.IO client
+    stores/                 # Zustand stores
+    theme/                  # Aurora and Ember palettes, interface metadata
+```
+
+---
+
+## Two Interfaces
+
+KhatBar ships with two complete visual interfaces. They are not themes bolted onto
+one design: each has its own palette, typography and surface treatment, and both
+expose every feature.
+
+| | Aurora | Ember |
+|---|---|---|
+| Character | Neutral, system-native, quiet | Warm signal in the dark |
+| Surfaces | Greyscale cards on white or black | Green-shifted charcoal ink |
+| Accent | Violet on web, iOS blue on mobile | Copper, single accent throughout |
+| Typography | Geist | Bricolage Grotesque for headings, Manrope for body |
+| Best for | Blending into the host OS | Long sessions, low light, focus |
+
+---
+
+## Local Chat (Offline and End-to-End Encrypted)
 
 A fully offline chat layer that never touches the server. It lives in
-[src/lib/local-chat/](src/lib/local-chat/) and is built from three layers.
+[src/lib/local-chat/](src/lib/local-chat/) and is built from three layers:
 
 ```
 +-------------------------------------------------------------+
@@ -321,24 +233,7 @@ A fully offline chat layer that never touches the server. It lives in
 +-------------------------------------------------------------+
 ```
 
-- **Transport** ([transport.ts](src/lib/local-chat/transport.ts)) &mdash;
-  `BroadcastChannel` discovers peers on the same machine instantly; WebRTC
-  DataChannels connect devices on the same Wi-Fi network with no STUN or TURN
-  servers, using host candidates only. Cross-network pairing uses an 8-character
-  code exchanged out of band.
-- **Crypto** ([crypto.ts](src/lib/local-chat/crypto.ts)) &mdash; every device generates
-  an ECDH P-256 identity keypair on first boot, stored in IndexedDB. Peers exchange
-  public keys at pairing time, and all messages are then sealed with AES-256-GCM
-  using the derived shared secret. Sniffing the LAN yields nothing readable.
-- **Sync** ([sync.ts](src/lib/local-chat/sync.ts) and
-  [db.ts](src/lib/local-chat/db.ts)) &mdash; outgoing messages are written to an outbox
-  as ciphertext before anything is sent. If the peer is unreachable they stay
-  pending and are re-sent automatically once the device is back in range; the peer
-  answers with an ack and the ledger flips to delivered. History is stored
-  decrypted only on the sender's device.
-
-### Using it
-
+**Using it:**
 1. Open KhatBar in two tabs, or on two devices on the same Wi-Fi network.
 2. In the sidebar choose **Local**, then **Pair**.
 3. Pick the discovered device and press **Pair**, or exchange a pairing code over LAN.
@@ -346,7 +241,7 @@ A fully offline chat layer that never touches the server. It lives in
 
 ---
 
-## Calls and encryption in detail
+## Calls and Encryption in Detail
 
 **Calls.** `call:invite` leads to `call:accept`, then signaling (`call:signal` carries
 SDP and ICE), then mesh peer connections. The call lifecycle is persisted through the
@@ -361,7 +256,7 @@ ciphertext.
 
 ---
 
-## Security and privacy audit disclaimer
+## Security and Privacy Audit Disclaimer
 
 KhatBar is a learning project and has NOT been reviewed by a professional
 security auditor. It is fine for personal use; it is NOT ready for production
@@ -398,7 +293,7 @@ tracked as GitHub Issues — contributions are welcome.
 
 ---
 
-## Tech stack
+## Tech Stack
 
 | Layer | Web | Mobile |
 |---|---|---|
@@ -416,7 +311,7 @@ tracked as GitHub Issues — contributions are welcome.
 
 ## Scripts
 
-Web:
+**Web:**
 
 ```bash
 npm run dev          # dev server on :3000, Socket.IO included
@@ -426,11 +321,12 @@ npm run lint         # eslint
 npx prisma db push   # apply the schema
 ```
 
-Mobile:
+**Mobile:**
 
 ```bash
 npx expo start        # Metro dev server
 npx expo run:android  # native build
+npx expo run:ios      # native build
 npx expo-doctor       # health check
 ```
 
@@ -442,6 +338,12 @@ Issues and pull requests are welcome. Before opening a pull request, please run
 `npm run lint` and `npm run build` for the web app and `npx tsc --noEmit` inside
 `mobile/`. If a change touches colour, keep both interfaces working: use the semantic
 tokens rather than literal hex values, so Aurora and Ember both stay correct.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
@@ -458,8 +360,3 @@ software is provided without warranty of any kind.
 Built with TypeScript, Next.js, React Native, WebRTC and WebCrypto.
 
 </div>
-
-
-
-
-
