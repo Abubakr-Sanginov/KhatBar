@@ -365,20 +365,7 @@ ciphertext.
 
 KhatBar is a learning project and has NOT been reviewed by a professional
 security auditor. It is fine for personal use; it is NOT ready for production
-data you cannot afford to lose. Known limitations, in order of severity:
-
-| Area | Current state | Gap / roadmap |
-|---|---|---|
-| Key pinning | Public keys are fetched from the server, no fingerprint UI | Show a fingerprint in the chat profile and verify it out-of-band (TOFU-style or manual comparison) |
-| Forward secrecy | Static ECDH keys; a compromised long-term key decrypts old chats | Ephemeral per-session DH or a Double Ratchet; re-derive keys periodically |
-| Pairing (local chat) | 8-character code + WebRTC SDP exchange on the same network | Add SAS (short authentication string) comparison during pairing |
-| Local key storage (web) | Private keys sit unencrypted in IndexedDB | PBKDF2-derived passphrase to encrypt the private key at rest |
-| Call relay | STUN only by default, TURN optional via env | Configure `NEXT_PUBLIC_TURN_*` for symmetric NATs; SFU (LiveKit/Mediasoup) for 3+ participant groups |
-| Message spam | Socket rate limiting is in place | Webhook-based abuse detection, CAPTCHA on registration |
-| Socket.IO scaling | Single-instance in-memory adapter | `@socket.io/redis-adapter` for horizontal scaling |
-| DB pooling | Prisma direct pool | PgBouncer or a serverless pooler for many concurrent connections |
-| Uploads | Magic-byte checks, SVG excluded | S3/MinIO object storage, image re-encoding, malware scanning |
-| Push notifications | None; calls and chats only work while the app is open | APNs / FCM via expo-notifications |
+data you cannot afford to lose.
 
 **Key lifecycle.** Identity keypairs live in the browser (WebCrypto, non-extractable)
 or SecureStore (mobile). The private half never leaves the device. When a user
@@ -387,6 +374,27 @@ conversations become undecryptable by design.
 
 **Reporting.** Found a bug or a security issue? Open a GitHub issue. Do not
 include real credentials or keys in reports.
+
+---
+
+## Active Development Roadmap
+
+The table below outlines known gaps and planned improvements. Items are
+tracked as GitHub Issues — contributions are welcome.
+
+| Area | Current state | Planned improvement | Issue |
+|---|---|---|---|
+| Forward secrecy | Static ECDH keys; a compromised long-term key decrypts old chats | Double Ratchet Protocol (Signal-style ratcheting) for per-message key derivation | [#1](https://github.com/Abubakr-Sanginov/KhatBar/issues/1) |
+| Key pinning | Public keys fetched from the server, no fingerprint UI | TOFU-style fingerprint verification in chat profile | — |
+| Pairing (local chat) | 8-character code + WebRTC SDP exchange | SAS (short authentication string) comparison during pairing | — |
+| Local key storage (web) | Private keys unencrypted in IndexedDB | PBKDF2-derived passphrase to encrypt keys at rest | [#4](https://github.com/Abubakr-Sanginov/KhatBar/issues/4) |
+| Call relay | STUN only by default, TURN optional | SFU (LiveKit/Mediasoup) for 3+ participant group calls | — |
+| Mesh call cleanup | RTCPeerConnection resources not fully released on leave | Proper disposal of connections, tracks and listeners | [#3](https://github.com/Abubakr-Sanginov/KhatBar/issues/3) |
+| Socket.IO scaling | Single-instance in-memory adapter | Redis adapter (`@socket.io/redis-adapter`) for horizontal scaling | [#2](https://github.com/Abubakr-Sanginov/KhatBar/issues/2) |
+| DB pooling | Prisma direct connection pool | PgBouncer or serverless pooler for high concurrency | — |
+| Uploads | Magic-byte checks, SVG excluded | S3/MinIO object storage, image re-encoding, malware scanning | — |
+| Push notifications | None; calls and chats only work while the app is open | APNs / FCM via expo-notifications | — |
+| Message spam | Socket rate limiting in place | Webhook-based abuse detection, CAPTCHA on registration | — |
 
 ---
 
