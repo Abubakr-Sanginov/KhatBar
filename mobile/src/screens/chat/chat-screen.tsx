@@ -19,6 +19,7 @@ import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
 import type { ThemeColors } from "../../theme/colors";
 import { formatMessageTime, displayName } from "../../lib/utils";
 import type { Message } from "../../types";
+import { Image, Film, Mic, Paperclip, ArrowUp } from "lucide-react-native";
 
 function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {
   const styles = useThemedStyles(makeStyles);
@@ -45,16 +46,16 @@ function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean })
   return (
     <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
       {message.type === "IMAGE" && (
-        <Text style={[styles.mediaText, textStyle]}>📷 Photo</Text>
+        <Text style={[styles.mediaText, textStyle]}><Image size={14} color={isOwn ? colors.onPrimary : colors.text} /> Photo</Text>
       )}
       {message.type === "VIDEO" && (
-        <Text style={[styles.mediaText, textStyle]}>🎬 Video</Text>
+        <Text style={[styles.mediaText, textStyle]}><Film size={14} color={isOwn ? colors.onPrimary : colors.text} /> Video</Text>
       )}
       {message.type === "AUDIO" && (
-        <Text style={[styles.mediaText, textStyle]}>🎤 Voice message</Text>
+        <Text style={[styles.mediaText, textStyle]}><Mic size={14} color={isOwn ? colors.onPrimary : colors.text} /> Voice message</Text>
       )}
       {message.type === "FILE" && (
-        <Text style={[styles.mediaText, textStyle]}>📎 File</Text>
+        <Text style={[styles.mediaText, textStyle]}><Paperclip size={14} color={isOwn ? colors.onPrimary : colors.text} /> File</Text>
       )}
       {message.type === "STICKER" && (
         <Text style={[styles.mediaText, textStyle]}>Sticker</Text>
@@ -198,7 +199,7 @@ export default function ChatScreen({ route, navigation }: any) {
           onPress={handleSend}
           disabled={!input.trim() || isSending}
         >
-          <Text style={styles.sendIcon}>↑</Text>
+          <ArrowUp size={18} color={colors.onPrimary} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

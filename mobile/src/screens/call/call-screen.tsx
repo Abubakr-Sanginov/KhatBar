@@ -10,6 +10,7 @@ import { useCallStore } from "../../stores/call-store";
 import { useCall } from "../../hooks/use-call";
 import { useThemedStyles } from "../../hooks/use-theme";
 import type { ThemeColors } from "../../theme/colors";
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff } from "lucide-react-native";
 
 export default function CallScreen({ navigation }: any) {
   const styles = useThemedStyles(makeStyles);
@@ -61,7 +62,7 @@ export default function CallScreen({ navigation }: any) {
               style={[styles.actionButton, styles.declineButton]}
               onPress={declineCall}
             >
-              <Text style={styles.actionIcon}>📞</Text>
+              <Text style={styles.actionIcon}><Phone size={32} color={colors.onImmersive} /></Text>
               <Text style={styles.actionLabel}>Decline</Text>
             </TouchableOpacity>
 
@@ -70,7 +71,7 @@ export default function CallScreen({ navigation }: any) {
               onPress={acceptCall}
             >
               <Text style={styles.actionIcon}>
-                {mode === "video" ? "📹" : "📞"}
+                {mode === "video" ? <Video size={32} color={colors.onImmersive} /> : <Phone size={32} color={colors.onImmersive} />}
               </Text>
               <Text style={styles.actionLabel}>Accept</Text>
             </TouchableOpacity>
@@ -131,7 +132,7 @@ export default function CallScreen({ navigation }: any) {
             style={[styles.controlButton, !isMicOn && styles.controlButtonOff]}
             onPress={toggleMic}
           >
-            <Text style={styles.controlIcon}>{isMicOn ? "🎤" : "🔇"}</Text>
+            <Text style={styles.controlIcon}>{isMicOn ? <Mic size={28} color={colors.onImmersive} /> : <MicOff size={28} color={colors.onImmersive} />}</Text>
             <Text style={styles.controlLabel}>{isMicOn ? "Mute" : "Unmute"}</Text>
           </TouchableOpacity>
 
@@ -140,7 +141,7 @@ export default function CallScreen({ navigation }: any) {
               style={[styles.controlButton, !isCameraOn && styles.controlButtonOff]}
               onPress={toggleCamera}
             >
-              <Text style={styles.controlIcon}>{isCameraOn ? "📹" : "📷"}</Text>
+              <Text style={styles.controlIcon}>{isCameraOn ? <Video size={28} color={colors.onImmersive} /> : <VideoOff size={28} color={colors.onImmersive} />}</Text>
               <Text style={styles.controlLabel}>
                 {isCameraOn ? "Camera On" : "Camera Off"}
               </Text>
@@ -154,7 +155,7 @@ export default function CallScreen({ navigation }: any) {
               navigation.goBack();
             }}
           >
-            <Text style={styles.controlIcon}>📞</Text>
+            <Text style={styles.controlIcon}><PhoneOff size={28} color={colors.onImmersive} /></Text>
             <Text style={styles.controlLabel}>End</Text>
           </TouchableOpacity>
         </View>

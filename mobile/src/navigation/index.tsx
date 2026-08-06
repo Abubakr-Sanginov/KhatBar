@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { ActivityIndicator, View, Text } from "react-native";
+import { MessageCircle, Settings } from "lucide-react-native";
 import { useAuthStore } from "../stores/auth-store";
 import { useThemeStore } from "../stores/theme-store";
 import { useThemeColors } from "../hooks/use-theme";
@@ -104,7 +105,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Chats",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Text style={{ fontSize: size || 22, color }}>💬</Text>
+            <MessageCircle size={size || 22} color={color} />
           ),
         }}
       />
@@ -114,7 +115,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Settings",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Text style={{ fontSize: size || 22, color }}>⚙️</Text>
+            <Settings size={size || 22} color={color} />
           ),
         }}
       />

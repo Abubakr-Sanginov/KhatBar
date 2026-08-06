@@ -16,6 +16,7 @@ import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
 import type { ThemeColors } from "../../theme/colors";
 import { getInitials, displayName } from "../../lib/utils";
 import type { User } from "../../types";
+import { Users } from "lucide-react-native";
 
 export default function NewChatScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
@@ -75,7 +76,7 @@ export default function NewChatScreen({ navigation }: any) {
         onPress={() => navigation.navigate("NewGroup")}
       >
         <View style={styles.optionIcon}>
-          <Text style={styles.optionIconText}>👥</Text>
+          <Users size={20} color={colors.onPrimary} />
         </View>
         <Text style={styles.optionText}>Create Group</Text>
       </TouchableOpacity>
