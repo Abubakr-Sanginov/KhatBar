@@ -15,8 +15,8 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post<LoginResponse>("/api/auth/login", { email, password }),
 
-  register: (email: string, password: string, displayName?: string) =>
-    api.post<RegisterResponse>("/api/auth/register", { email, password, displayName }),
+  register: (email: string, password: string, username?: string) =>
+    api.post<RegisterResponse>("/api/auth/register", { email, password, username }),
 
   getSession: () => api.get<{ user: User }>("/api/auth/session"),
 
