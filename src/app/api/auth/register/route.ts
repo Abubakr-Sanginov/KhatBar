@@ -12,16 +12,19 @@ export async function POST(req: Request) {
     if (!isValidEmail(email) || password.length < 8 || password.length > 256) {
       return NextResponse.json({ error: "Enter a valid email and a password of at least 8 characters" }, { status: 400 })
     }
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: { equals: email, mode: "insensitive" } },
-          ...(username ? [{ username }] : []),
-        ],
-      },
+    const existingEmail = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
     })
-    if (existing) {
-      return NextResponse.json({ error: "User already exists" }, { status: 409 })
+    if (existingEmail) {
+      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 })
+    }
+    if (username) {
+      const existingUsername = await prisma.user.findFirst({
+        where: { username },
+      })
+      if (existingUsername) {
+        return NextResponse.json({ error: "This username is already taken" }, { status: 409 })
+      }
     }
     const passwordHash = crypto.createHash("sha256").update(password).digest("hex")
     const user = await prisma.user.create({
