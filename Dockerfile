@@ -40,9 +40,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/next.config.* ./
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
 RUN chown -R nextjs:nodejs /app
 USER nextjs
 
-# apply the schema on boot (idempotent) then start the custom server
-CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then npx prisma db push; fi && node_modules/.bin/tsx server.ts"]
+CMD ["sh", "./docker-entrypoint.sh"]
