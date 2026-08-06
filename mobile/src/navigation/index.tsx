@@ -157,6 +157,7 @@ export default function AppNavigator() {
         text: colors.text,
         border: colors.border,
         notification: colors.primary,
+        regular: colors.text,
       },
     }),
     [colors, mode]
