@@ -59,7 +59,10 @@ export function MessageInput() {
         })
         if (res.ok) {
           const data = await res.json()
-          if (data.message) addMessage(activeChat.id, data.message)
+          if (data.message) {
+            const { normalizeIncomingMessage } = await import("@/lib/incoming-message")
+            addMessage(activeChat.id, await normalizeIncomingMessage(activeChat, user.id, data.message))
+          }
         }
       }
     } catch {

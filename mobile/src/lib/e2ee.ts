@@ -343,3 +343,13 @@ export async function decryptPrivateChatMessages(
 export function isEncryptedEnvelope(value: unknown): boolean {
   return parseEncryptedEnvelope(value) !== null;
 }
+
+export async function normalizeIncomingMessage(
+  chat: Chat | null | undefined,
+  userId: string | null | undefined,
+  message: Message,
+): Promise<Message> {
+  if (!chat || !userId) return message;
+  const [normalized] = await decryptPrivateChatMessages(chat, userId, [message]);
+  return normalized;
+}

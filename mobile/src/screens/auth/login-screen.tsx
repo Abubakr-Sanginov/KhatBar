@@ -128,7 +128,7 @@ export default function LoginScreen({ navigation }: any) {
           />
         </View>
 
-        <Animated.View entering={FadeInUp.delay(500).duration(400}>
+        <Animated.View entering={FadeInUp.delay(500).duration(400)}>
           <Pressable
             onPressIn={() => { buttonScale.value = withSpring(0.96); }}
             onPressOut={() => { buttonScale.value = withSpring(1); }}

@@ -42,6 +42,7 @@ import { useSocket } from "@/hooks/use-socket"
 import { useCall } from "@/hooks/use-call"
 import { cn } from "@/lib/utils"
 import { decryptPrivateChatMessages } from "@/lib/e2ee"
+import { normalizeIncomingMessage } from "@/lib/incoming-message"
 import { getChatDisplayName, getChatUsername, formatMessageTime, canPostToChat } from "@/lib/chat-utils"
 import type { Message } from "@/types"
 
@@ -245,8 +246,8 @@ export function MessagePanel() {
   useEffect(() => {
     const offNew = on("message:new", (data) => {
       const msg = data as Message
-      const chat = chats.find((item) => item.id === msg.chatId)
-      void decryptPrivateChatMessages(chat ?? activeChat!, user?.id ?? "", [msg]).then(([decrypted]) => {
+      const chat = chats.find((item) => item.id === msg.chatId) ?? (activeChat?.id === msg.chatId ? activeChat : undefined)
+      void normalizeIncomingMessage(chat, user?.id, msg).then((decrypted) => {
         touchChat(msg.chatId, decrypted)
         if (msg.chatId === chatId) addMessage(chatId!, decrypted)
         else if (msg.senderId !== user?.id) incrementUnread(msg.chatId)

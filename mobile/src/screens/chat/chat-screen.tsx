@@ -199,8 +199,7 @@ export default function ChatScreen({ route, navigation }: any) {
   const hasMore = useMessageStore((s) => s.hasMoreByChat[chatId] ?? false);
   const loadMessages = useMessageStore((s) => s.loadMessages);
   const loadMore = useMessageStore((s) => s.loadMore);
-  const addMessage = useMessageStore((s) => s.addMessage);
-  const { joinChat, leaveChat, sendMessage, markRead, sendTyping, on } = useSocket();
+  const { joinChat, leaveChat, sendMessage, markRead, sendTyping } = useSocket();
   const deleteChat = useChatStore((s) => s.deleteChat);
   const typingUserIds = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.typingUserIds ?? EMPTY_ARRAY);
   const [input, setInput] = useState("");
@@ -234,22 +233,6 @@ export default function ChatScreen({ route, navigation }: any) {
     markRead(chatId);
     return () => { cancelled = true; leaveChat(chatId); };
   }, [chatId, activeChat?.id]);
-
-  useEffect(() => {
-    if (!activeChat || !user?.id) return;
-    const off = on("message:new", (data: any) => {
-      const msg = data as Message;
-      if (msg.chatId !== chatId) return;
-      if (isEncryptedChat(activeChat)) {
-        decryptPrivateChatMessages(activeChat, user.id, [msg]).then(([decrypted]) => {
-          addMessage(chatId, decrypted);
-        });
-      } else {
-        addMessage(chatId, msg);
-      }
-    });
-    return () => { if (typeof off === "function") off(); };
-  }, [chatId, activeChat?.id, user?.id]);
 
   useEffect(() => {
     navigation.setOptions({

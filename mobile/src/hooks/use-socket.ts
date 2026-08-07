@@ -4,11 +4,10 @@ import { getSocket, disconnectSocket, getSocketInstance } from "../socket/socket
 import { useAuthStore } from "../stores/auth-store";
 import { useChatStore } from "../stores/chat-store";
 import { useMessageStore } from "../stores/message-store";
+import { normalizeIncomingMessage } from "../lib/e2ee";
 
 export function useSocket() {
   const user = useAuthStore((s) => s.user);
-  const addMessageToChat = useChatStore((s) => s.addMessageToChat);
-  const addMessage = useMessageStore((s) => s.addMessage);
   const updateChatInList = useChatStore((s) => s.updateChatInList);
   const connectedRef = useRef(false);
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -30,8 +29,13 @@ export function useSocket() {
       });
 
       socket.on("message:new", (message: any) => {
-        addMessageToChat(message.chatId, message);
-        addMessage(message.chatId, message);
+        const chatState = useChatStore.getState();
+        const chat = chatState.chats.find((item) => item.id === message.chatId)
+          ?? (chatState.activeChat?.id === message.chatId ? chatState.activeChat : undefined);
+        void normalizeIncomingMessage(chat, useAuthStore.getState().user?.id, message).then((normalized) => {
+          chatState.addMessageToChat(message.chatId, normalized);
+          useMessageStore.getState().addMessage(message.chatId, normalized);
+        });
       });
 
       socket.on("message:deleted", (data: { messageId: string }) => {
