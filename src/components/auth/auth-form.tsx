@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAuth } from "@/hooks/use-auth"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -13,6 +14,7 @@ interface AuthFormProps {
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { login, register } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -32,20 +34,14 @@ export function AuthForm({ mode }: AuthFormProps) {
     const username = String(form.get("username") || "").trim()
 
     try {
-      const url = mode === "login" ? "/api/auth/login" : "/api/auth/register"
-      const body = mode === "login" ? { email, password } : { email, username, password }
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Something went wrong")
+      if (mode === "login") {
+        await login(email, password)
+      } else {
+        await register(email, username, password)
       }
 
+      // AuthProvider now contains the response user and socket token before the
+      // chat route mounts, so user-dependent effects run on the first render.
       router.push(nextPath)
       router.refresh()
     } catch (err) {
