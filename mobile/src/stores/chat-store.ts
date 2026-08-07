@@ -9,6 +9,8 @@ type ChatListItem = Chat & {
   lastMessage?: Message | null;
   unreadCount: number;
   _count?: { members: number };
+  typingUserIds?: string[];
+  memberPresence?: Record<string, string>;
 };
 
 interface ChatState {
@@ -29,6 +31,9 @@ interface ChatState {
   searchChats: (query: string) => Promise<Chat[]>;
   addMember: (chatId: string, memberIds: string[]) => Promise<void>;
   removeMember: (chatId: string, userId: string) => Promise<void>;
+  setTypingUser: (chatId: string, userId: string) => void;
+  clearTypingUser: (chatId: string, userId: string) => void;
+  updateMemberPresence: (userId: string, status: string) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -137,6 +142,44 @@ export const useChatStore = create<ChatState>()(
     await chatsApi.removeMember(chatId, userId);
     const updated = await chatsApi.get(chatId);
     set({ activeChat: updated.chat });
+  },
+
+  setTypingUser: (chatId, userId) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              typingUserIds: [...(c.typingUserIds || []).filter((id) => id !== userId), userId],
+            }
+          : c
+      ),
+    }));
+  },
+
+  clearTypingUser: (chatId, userId) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              typingUserIds: (c.typingUserIds || []).filter((id) => id !== userId),
+            }
+          : c
+      ),
+    }));
+  },
+
+  updateMemberPresence: (userId, status) => {
+    set((s) => ({
+      chats: s.chats.map((c) => ({
+        ...c,
+        memberPresence: {
+          ...(c.memberPresence || {}),
+          [userId]: status,
+        },
+      })),
+    }));
   },
     }),
     {

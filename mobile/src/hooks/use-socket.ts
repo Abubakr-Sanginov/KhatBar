@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSocket, disconnectSocket, getSocketInstance } from "../socket/socket";
 import { useAuthStore } from "../stores/auth-store";
@@ -11,6 +11,7 @@ export function useSocket() {
   const addMessage = useMessageStore((s) => s.addMessage);
   const updateChatInList = useChatStore((s) => s.updateChatInList);
   const connectedRef = useRef(false);
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   useEffect(() => {
     if (!user || connectedRef.current) return;
 
@@ -47,11 +48,31 @@ export function useSocket() {
       });
 
       socket.on("typing", (data: { chatId: string; userId: string; isTyping: boolean }) => {
-        // Could be used for typing indicators
+        const chatState = useChatStore.getState();
+        if (data.isTyping && data.userId !== user?.id) {
+          chatState.setTypingUser(data.chatId, data.userId);
+          const existing = typingTimersRef.current.get(`${data.chatId}:${data.userId}`);
+          if (existing) clearTimeout(existing);
+          typingTimersRef.current.set(
+            `${data.chatId}:${data.userId}`,
+            setTimeout(() => {
+              chatState.clearTypingUser(data.chatId, data.userId);
+              typingTimersRef.current.delete(`${data.chatId}:${data.userId}`);
+            }, 3000)
+          );
+        } else {
+          chatState.clearTypingUser(data.chatId, data.userId);
+          const existing = typingTimersRef.current.get(`${data.chatId}:${data.userId}`);
+          if (existing) {
+            clearTimeout(existing);
+            typingTimersRef.current.delete(`${data.chatId}:${data.userId}`);
+          }
+        }
       });
 
       socket.on("presence:update", (data: { userId: string; status: string }) => {
-        // Could update user presence in chat members
+        const chatState = useChatStore.getState();
+        chatState.updateMemberPresence(data.userId, data.status as any);
       });
 
       connectedRef.current = true;
@@ -61,6 +82,8 @@ export function useSocket() {
 
     return () => {
       mounted = false;
+      typingTimersRef.current.forEach((timer) => clearTimeout(timer));
+      typingTimersRef.current.clear();
       disconnectSocket();
       connectedRef.current = false;
     };
@@ -146,8 +169,21 @@ export function useSocket() {
     [emit]
   );
 
-  return {
+  const on = useCallback(
+    (event: string, handler: (...args: any[]) => void) => {
+      const socket = getSocketInstance();
+      if (!socket) return () => {};
+      socket.on(event, handler);
+      return () => {
+        socket.off(event, handler);
+      };
+    },
+    []
+  );
+
+  return useMemo(() => ({
     emit,
+    on,
     joinChat,
     leaveChat,
     sendTyping,
@@ -159,5 +195,5 @@ export function useSocket() {
     sendCallSignal,
     sendMediaState,
     markRead,
-  };
+  }), []);
 }

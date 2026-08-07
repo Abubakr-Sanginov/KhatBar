@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, Pressable } from "react-native-reanimated";
 import { useAuthStore } from "../../stores/auth-store";
 import { usersApi } from "../../api/users";
 import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
@@ -25,6 +26,11 @@ export default function ProfileScreen({ navigation }: any) {
   const [phone, setPhone] = useState(user?.phone || "");
   const [username, setUsername] = useState(user?.username || "");
   const [saving, setSaving] = useState(false);
+
+  const buttonScale = useSharedValue(1);
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -45,11 +51,11 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
+      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.header}>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-      </View>
+      </Animated.View>
 
-      <View style={styles.avatarSection}>
+      <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.avatarSection}>
         <View style={styles.avatarLarge}>
           <Text style={styles.avatarText}>
             {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?"}
@@ -58,9 +64,9 @@ export default function ProfileScreen({ navigation }: any) {
         <TouchableOpacity>
           <Text style={styles.changePhoto}>Change Photo</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      <View style={styles.form}>
+      <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.form}>
         <Text style={styles.label}>Display Name</Text>
         <TextInput
           style={styles.input}
@@ -107,19 +113,30 @@ export default function ProfileScreen({ navigation }: any) {
           placeholderTextColor={colors.muted}
           keyboardType="phone-pad"
         />
-      </View>
+      </Animated.View>
 
-      <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        {saving ? (
-          <ActivityIndicator color={colors.onPrimary} />
-        ) : (
-          <Text style={styles.saveText}>Save Changes</Text>
-        )}
-      </TouchableOpacity>
+      <Animated.View entering={FadeInUp.delay(400).duration(400)}>
+        <Pressable
+          onPressIn={() => { buttonScale.value = withSpring(0.96); }}
+          onPressOut={() => { buttonScale.value = withSpring(1); }}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Animated.View
+            style={[
+              styles.saveButton,
+              saving && styles.saveButtonDisabled,
+              buttonAnimatedStyle,
+            ]}
+          >
+            {saving ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Text style={styles.saveText}>Save Changes</Text>
+            )}
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
     </ScrollView>
   );
 }

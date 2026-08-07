@@ -8,27 +8,42 @@ let socket: Socket | null = null;
 export async function getSocket(): Promise<Socket> {
   if (socket?.connected) return socket;
 
-  if (!socket) {
-    socket = io(API_BASE, {
-      transports: ["websocket"],
-      autoConnect: false,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-    });
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
   }
 
-  if (!socket.connected) {
-    const token = await AsyncStorage.getItem("session_token");
-    socket.auth = { token };
-    socket.connect();
-  }
+  const token = await AsyncStorage.getItem("session_token");
+
+  socket = io(API_BASE, {
+    transports: ["websocket", "polling"],
+    auth: { token },
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: 20,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+  });
+
+  socket.on("connect", () => {
+    console.log("[Socket] Connected:", socket?.id);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("[Socket] Disconnected:", reason);
+  });
+
+  socket.on("connect_error", (err) => {
+    console.log("[Socket] Connect error:", err.message);
+  });
 
   return socket;
 }
 
 export function disconnectSocket() {
   if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }

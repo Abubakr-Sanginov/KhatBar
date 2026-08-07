@@ -8,7 +8,9 @@ import {
   Switch,
   Alert,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useAuthStore } from "../../stores/auth-store";
+import { usersApi } from "../../api/users";
 import { useThemeStore, type ModePreference } from "../../stores/theme-store";
 import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
 import { SKIN_LIST } from "../../theme/skins";
@@ -20,7 +22,6 @@ const MODES: { id: ModePreference; label: string }[] = [
   { id: "system", label: "System" },
 ];
 
-/** Interface picker: the same two skins the web app offers, same names. */
 function InterfacePicker() {
   const styles = useThemedStyles(makeStyles);
   const skin = useThemeStore((s) => s.skin);
@@ -61,7 +62,6 @@ function InterfacePicker() {
   );
 }
 
-/** Light / dark / system, orthogonal to the interface choice. */
 function ModePicker() {
   const styles = useThemedStyles(makeStyles);
   const modePreference = useThemeStore((s) => s.modePreference);
@@ -105,49 +105,57 @@ export default function SettingsScreen({ navigation }: any) {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+      </Animated.View>
 
-      <TouchableOpacity
-        style={styles.profileCard}
-        onPress={() => navigation.navigate("Profile")}
-      >
-        <View style={styles.avatarLarge}>
-          <Text style={styles.avatarText}>
-            {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?"}
-          </Text>
-        </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.displayName || "Set display name"}</Text>
-          <Text style={styles.profileEmail}>{user?.email}</Text>
-          {user?.username && (
-            <Text style={styles.profileUsername}>@{user.username}</Text>
-          )}
-        </View>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
+      <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+        <TouchableOpacity
+          style={styles.profileCard}
+          onPress={() => navigation.navigate("Profile")}
+        >
+          <View style={styles.avatarLarge}>
+            <Text style={styles.avatarText}>
+              {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?"}
+            </Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{user?.displayName || "Set display name"}</Text>
+            <Text style={styles.profileEmail}>{user?.email}</Text>
+            {user?.username && (
+              <Text style={styles.profileUsername}>@{user.username}</Text>
+            )}
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-      <View style={styles.section}>
+      <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
         <Text style={styles.sectionTitle}>Interface</Text>
         <InterfacePicker />
         <Text style={styles.sectionHint}>
           Applies to this device instantly. Both interfaces share the same features.
         </Text>
-      </View>
+      </Animated.View>
 
-      <View style={styles.section}>
+      <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
         <Text style={styles.sectionTitle}>Appearance</Text>
         <ModePicker />
-      </View>
+      </Animated.View>
 
-      <View style={styles.section}>
+      <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
         <Text style={styles.sectionTitle}>Privacy</Text>
 
         <View style={styles.settingRow}>
           <Text style={styles.settingLabel}>Show Online Status</Text>
           <Switch
             value={user?.privacyShowStatus ?? true}
+            onValueChange={async (val) => {
+              try {
+                const updated = await usersApi.updateSettings({ privacyShowStatus: val });
+                useAuthStore.getState().setUser(updated.user);
+              } catch {}
+            }}
             trackColor={{ false: colors.muted, true: colors.primary }}
           />
         </View>
@@ -156,6 +164,12 @@ export default function SettingsScreen({ navigation }: any) {
           <Text style={styles.settingLabel}>Show Last Seen</Text>
           <Switch
             value={user?.privacyShowLastSeen ?? true}
+            onValueChange={async (val) => {
+              try {
+                const updated = await usersApi.updateSettings({ privacyShowLastSeen: val });
+                useAuthStore.getState().setUser(updated.user);
+              } catch {}
+            }}
             trackColor={{ false: colors.muted, true: colors.primary }}
           />
         </View>
@@ -164,12 +178,18 @@ export default function SettingsScreen({ navigation }: any) {
           <Text style={styles.settingLabel}>Read Receipts</Text>
           <Switch
             value={user?.privacyReadReceipts ?? true}
+            onValueChange={async (val) => {
+              try {
+                const updated = await usersApi.updateSettings({ privacyReadReceipts: val });
+                useAuthStore.getState().setUser(updated.user);
+              } catch {}
+            }}
             trackColor={{ false: colors.muted, true: colors.primary }}
           />
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={styles.section}>
+      <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
 
         <TouchableOpacity
@@ -189,11 +209,13 @@ export default function SettingsScreen({ navigation }: any) {
           <Text style={styles.menuLabel}>Storage & Data</Text>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
+      <Animated.View entering={FadeInUp.delay(700).duration(400)}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       <Text style={styles.version}>KhatBar v1.0.0</Text>
     </ScrollView>
@@ -396,7 +418,6 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: "center",
     },
     logoutText: {
-      // Every palette's destructive is a saturated red, so white stays legible.
       color: "#ffffff",
       fontSize: 16,
       fontWeight: "600",

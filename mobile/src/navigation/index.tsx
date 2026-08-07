@@ -16,6 +16,9 @@ import ChatListScreen from "../screens/chat/chat-list-screen";
 import ChatScreen from "../screens/chat/chat-screen";
 import NewChatScreen from "../screens/chat/new-chat-screen";
 import NewGroupScreen from "../screens/chat/new-group-screen";
+import LocalChatsScreen from "../screens/chat/local-chats-screen";
+import LocalChatScreen from "../screens/chat/local-chat-screen";
+import LocalPairScreen from "../screens/chat/local-pair-screen";
 import CallScreen from "../screens/call/call-screen";
 import SettingsScreen from "../screens/settings/settings-screen";
 import ProfileScreen from "../screens/settings/profile-screen";
@@ -61,6 +64,21 @@ function ChatStackNavigator() {
         name="NewGroup"
         component={NewGroupScreen}
         options={headerOptions(colors, "New Group")}
+      />
+      <ChatStack.Screen
+        name="LocalChats"
+        component={LocalChatsScreen}
+        options={headerOptions(colors, "Local Chats")}
+      />
+      <ChatStack.Screen
+        name="LocalChat"
+        component={LocalChatScreen}
+        options={({ route }: any) => headerOptions(colors, route.params?.peerName || "Local Chat")}
+      />
+      <ChatStack.Screen
+        name="LocalPair"
+        component={LocalPairScreen}
+        options={headerOptions(colors, "Pair Device")}
       />
     </ChatStack.Navigator>
   );
@@ -139,7 +157,10 @@ function AuthNavigator() {
 }
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading, user, checkSession } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const user = useAuthStore((s) => s.user);
+  const checkSession = useAuthStore((s) => s.checkSession);
   const colors = useThemeColors();
   const mode = useThemeStore((s) => s.mode);
   const isThemeHydrated = useThemeStore((s) => s.isHydrated);
@@ -160,11 +181,11 @@ export default function AppNavigator() {
         notification: colors.primary,
       },
       fonts: {
-        regular: { fontFamily: "System", fontWeight: "400" },
-        medium: { fontFamily: "System", fontWeight: "500" },
-        bold: { fontFamily: "System", fontWeight: "700" },
-        heavy: { fontFamily: "System", fontWeight: "900" },
-        thin: { fontFamily: "System", fontWeight: "100" },
+        regular: { fontFamily: "System", fontWeight: "400" as const },
+        medium: { fontFamily: "System", fontWeight: "500" as const },
+        bold: { fontFamily: "System", fontWeight: "700" as const },
+        heavy: { fontFamily: "System", fontWeight: "900" as const },
+        thin: { fontFamily: "System", fontWeight: "100" as const },
       },
     }),
     [colors, mode]

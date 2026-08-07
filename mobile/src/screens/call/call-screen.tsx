@@ -8,12 +8,13 @@ import {
 } from "react-native";
 import { useCallStore } from "../../stores/call-store";
 import { useCall } from "../../hooks/use-call";
-import { useThemedStyles } from "../../hooks/use-theme";
+import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
 import type { ThemeColors } from "../../theme/colors";
 import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff } from "lucide-react-native";
 
 export default function CallScreen({ navigation }: any) {
   const styles = useThemedStyles(makeStyles);
+  const colors = useThemeColors();
   const {
     phase,
     chatName,
@@ -23,8 +24,7 @@ export default function CallScreen({ navigation }: any) {
     participants,
     answeredAt,
   } = useCallStore();
-  const { hangUp, toggleMic, toggleCamera, acceptCall, declineCall, setMinimized } =
-    useCall();
+  const { hangUp, toggleMic, toggleCamera, acceptCall, declineCall } = useCall();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -62,7 +62,9 @@ export default function CallScreen({ navigation }: any) {
               style={[styles.actionButton, styles.declineButton]}
               onPress={declineCall}
             >
-              <Text style={styles.actionIcon}><Phone size={32} color={colors.onImmersive} /></Text>
+              <View style={[styles.actionCircle, { backgroundColor: "#EF4444" }]}>
+                <PhoneOff size={28} color="#fff" />
+              </View>
               <Text style={styles.actionLabel}>Decline</Text>
             </TouchableOpacity>
 
@@ -70,9 +72,13 @@ export default function CallScreen({ navigation }: any) {
               style={[styles.actionButton, styles.acceptButton]}
               onPress={acceptCall}
             >
-              <Text style={styles.actionIcon}>
-                {mode === "video" ? <Video size={32} color={colors.onImmersive} /> : <Phone size={32} color={colors.onImmersive} />}
-              </Text>
+              <View style={[styles.actionCircle, { backgroundColor: "#22C55E" }]}>
+                {mode === "video" ? (
+                  <Video size={28} color="#fff" />
+                ) : (
+                  <Phone size={28} color="#fff" />
+                )}
+              </View>
               <Text style={styles.actionLabel}>Accept</Text>
             </TouchableOpacity>
           </View>
@@ -132,7 +138,9 @@ export default function CallScreen({ navigation }: any) {
             style={[styles.controlButton, !isMicOn && styles.controlButtonOff]}
             onPress={toggleMic}
           >
-            <Text style={styles.controlIcon}>{isMicOn ? <Mic size={28} color={colors.onImmersive} /> : <MicOff size={28} color={colors.onImmersive} />}</Text>
+            <View style={[styles.controlCircle, { backgroundColor: !isMicOn ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.25)" }]}>
+              {isMicOn ? <Mic size={24} color="#fff" /> : <MicOff size={24} color="#fff" />}
+            </View>
             <Text style={styles.controlLabel}>{isMicOn ? "Mute" : "Unmute"}</Text>
           </TouchableOpacity>
 
@@ -141,9 +149,11 @@ export default function CallScreen({ navigation }: any) {
               style={[styles.controlButton, !isCameraOn && styles.controlButtonOff]}
               onPress={toggleCamera}
             >
-              <Text style={styles.controlIcon}>{isCameraOn ? <Video size={28} color={colors.onImmersive} /> : <VideoOff size={28} color={colors.onImmersive} />}</Text>
+              <View style={[styles.controlCircle, { backgroundColor: !isCameraOn ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.25)" }]}>
+                {isCameraOn ? <Video size={24} color="#fff" /> : <VideoOff size={24} color="#fff" />}
+              </View>
               <Text style={styles.controlLabel}>
-                {isCameraOn ? "Camera On" : "Camera Off"}
+                {isCameraOn ? "Camera" : "Camera Off"}
               </Text>
             </TouchableOpacity>
           )}
@@ -155,7 +165,9 @@ export default function CallScreen({ navigation }: any) {
               navigation.goBack();
             }}
           >
-            <Text style={styles.controlIcon}><PhoneOff size={28} color={colors.onImmersive} /></Text>
+            <View style={[styles.controlCircle, { backgroundColor: "#EF4444" }]}>
+              <PhoneOff size={24} color="#fff" />
+            </View>
             <Text style={styles.controlLabel}>End</Text>
           </TouchableOpacity>
         </View>
@@ -166,8 +178,6 @@ export default function CallScreen({ navigation }: any) {
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    // The call stage is a full-bleed media surface, so it keeps the immersive
-    // pair in every interface rather than the page background.
     container: {
       flex: 1,
       backgroundColor: colors.immersive,
@@ -221,26 +231,31 @@ const makeStyles = (colors: ThemeColors) =>
     },
     incomingActions: {
       flexDirection: "row",
-      gap: 40,
+      gap: 60,
     },
     actionButton: {
       alignItems: "center",
-      gap: 8,
+      gap: 12,
     },
     declineButton: {},
     acceptButton: {},
-    actionIcon: {
-      fontSize: 32,
+    actionCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: "center",
+      justifyContent: "center",
     },
     actionLabel: {
       color: colors.onImmersive,
       fontSize: 14,
+      fontWeight: "500",
     },
     controls: {
       flexDirection: "row",
       justifyContent: "center",
       alignItems: "center",
-      gap: 24,
+      gap: 32,
       paddingBottom: 40,
       paddingHorizontal: 20,
     },
@@ -252,13 +267,18 @@ const makeStyles = (colors: ThemeColors) =>
       opacity: 0.7,
     },
     hangUpButton: {},
-    controlIcon: {
-      fontSize: 28,
-      marginBottom: 4,
+    controlCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 6,
     },
     controlLabel: {
       color: colors.onImmersive,
       fontSize: 12,
+      fontWeight: "500",
     },
     participantTile: {
       alignItems: "center",
