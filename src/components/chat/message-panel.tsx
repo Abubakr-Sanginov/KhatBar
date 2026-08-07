@@ -92,7 +92,7 @@ function MessageBubble({
     >
       <div
         className={cn(
-          "relative max-w-[70%] rounded-2xl px-4 py-2 text-sm transition-shadow",
+          "relative min-w-0 max-w-[min(75%,42rem)] rounded-2xl px-4 py-2 text-sm transition-shadow",
           isMine
             ? "bg-primary text-primary-foreground rounded-br-md"
             : "bg-secondary text-secondary-foreground rounded-bl-md",
@@ -143,7 +143,7 @@ function MessageBubble({
         {isDeleted ? (
           <p className="italic opacity-60">Message deleted</p>
         ) : msg.type === "TEXT" ? (
-          <p>{msg.content}</p>
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.content}</p>
         ) : msg.type === "IMAGE" ? (
           <img src={msg.mediaUrl!} alt="" className="max-h-80 rounded-xl" />
         ) : msg.type === "GIF" ? (
@@ -162,7 +162,7 @@ function MessageBubble({
         ) : msg.type === "SYSTEM" ? (
           <p className="text-xs italic opacity-70">{msg.content}</p>
         ) : (
-          <p>{msg.content}</p>
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.content}</p>
         )}
 
         <p className={cn("mt-0.5 text-right text-[10px]", isMine ? "text-primary-foreground/60" : "text-muted-foreground")}>

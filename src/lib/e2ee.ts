@@ -208,21 +208,33 @@ export async function decryptPrivateChatMessages(chat: Chat, userId: string, mes
     try {
       const key = await privateGroupKey(chat, userId)
       return Promise.all(messages.map(async (message) => {
-        if (!message.isEncrypted || !message.content) return message
-        return { ...message, content: new TextDecoder().decode(await decryptWithKey(key, message.content)) }
+        if (!message.content || (!message.isEncrypted && !isEncryptedEnvelope(message.content))) return message
+        try {
+          return { ...message, content: new TextDecoder().decode(await decryptWithKey(key, message.content)) }
+        } catch {
+          return { ...message, content: "Encrypted message — unable to decrypt" }
+        }
       }))
     } catch {
-      return messages.map((message) => message.isEncrypted ? { ...message, content: "Encrypted message — key unavailable" } : message)
+      return messages.map((message) =>
+      message.isEncrypted || isEncryptedEnvelope(message.content)
+        ? { ...message, content: "Encrypted message — key unavailable" }
+        : message,
+    )
     }
   }
   let peer: { publicKey: string; salt: string }
   try {
     peer = privatePeer(chat, userId)
   } catch {
-    return messages.map((message) => message.isEncrypted ? { ...message, content: "Encrypted message — key unavailable" } : message)
+    return messages.map((message) =>
+      message.isEncrypted || isEncryptedEnvelope(message.content)
+        ? { ...message, content: "Encrypted message — key unavailable" }
+        : message,
+    )
   }
   return Promise.all(messages.map(async (message) => {
-    if (!message.isEncrypted || !message.content) return message
+    if (!message.content || (!message.isEncrypted && !isEncryptedEnvelope(message.content))) return message
     try {
       return { ...message, content: await decryptPrivateText(userId, peer.publicKey, peer.salt, message.content) }
     } catch {

@@ -89,11 +89,11 @@ export function LocalChatPanel() {
               >
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-3 py-2 text-sm",
+                    "min-w-0 max-w-[min(75%,42rem)] rounded-2xl px-3 py-2 text-sm",
                     mine ? "bg-primary text-primary-foreground" : "bg-muted",
                   )}
                 >
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                  <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
                   <p
                     className={cn(
                       "mt-1 text-right text-[10px]",
