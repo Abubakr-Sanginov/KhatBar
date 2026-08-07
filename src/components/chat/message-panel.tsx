@@ -177,7 +177,7 @@ function MessageBubble({
 export function MessagePanel() {
   const { activeChat, chats, messages, setMessages, prependMessages, addMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
   const { toggleInfoPanel } = useUIStore()
-  const { user } = useAuth()
+  const { user, encryptionReady } = useAuth()
   const { isConnected, emit, on } = useSocket()
   const { startCall: beginCall } = useCall()
   const [isTyping, setIsTyping] = useState(false)
@@ -214,7 +214,7 @@ export function MessagePanel() {
     return () => {
       cancelled = true
     }
-  }, [chatId, activeChat, setMessages, user?.id])
+  }, [chatId, activeChat, setMessages, user?.id, encryptionReady])
 
   async function loadOlder() {
     if (!chatId || loadingOlder) return

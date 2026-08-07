@@ -30,6 +30,22 @@ const INFO = "KhatBar private chat v1";
 type EncryptedEnvelope = { v: 1; iv: string; ciphertext: string };
 type GroupParticipant = { id: string; encryptionPublicKey?: string | null };
 
+export const ENCRYPTED_MESSAGE_KEY_UNAVAILABLE = "Encrypted message — key unavailable";
+export const ENCRYPTED_MESSAGE_DECRYPT_FAILED = "Encrypted message — unable to decrypt";
+
+function parseEncryptedEnvelope(value: unknown): EncryptedEnvelope | null {
+  let parsed: unknown = value;
+  for (let depth = 0; depth < 2 && typeof parsed === "string"; depth += 1) {
+    if (parsed.length > 50_000) return null;
+    try { parsed = JSON.parse(parsed); } catch { return null; }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const envelope = parsed as Partial<EncryptedEnvelope>;
+  return envelope.v === 1 && typeof envelope.iv === "string" && typeof envelope.ciphertext === "string"
+    ? envelope as EncryptedEnvelope
+    : null;
+}
+
 const ECDH = { name: "ECDH", namedCurve: "P-256" } as const;
 
 /** Hermes has no atob/btoa and TextEncoder is not guaranteed, so do it by hand. */
@@ -183,8 +199,8 @@ async function encryptWithKey(key: any, plaintext: Uint8Array): Promise<string> 
 }
 
 async function decryptWithKey(key: any, encoded: string): Promise<Uint8Array> {
-  const envelope = JSON.parse(encoded) as EncryptedEnvelope;
-  if (envelope.v !== 1 || !envelope.iv || !envelope.ciphertext) {
+  const envelope = parseEncryptedEnvelope(encoded);
+  if (!envelope) {
     throw new Error("Invalid encrypted message");
   }
   const plaintext = await subtle.decrypt(
@@ -293,7 +309,7 @@ export async function decryptPrivateChatMessages(
       const key = await privateGroupKey(chat, userId);
       return Promise.all(
         messages.map(async (message) => {
-          if (!message.isEncrypted || !message.content) return message;
+          if (!message.content || (!message.isEncrypted && !isEncryptedEnvelope(message.content))) return message;
           try {
             return { ...message, content: bytesToUtf8(await decryptWithKey(key, message.content)) };
           } catch {
@@ -314,7 +330,7 @@ export async function decryptPrivateChatMessages(
   }
   return Promise.all(
     messages.map(async (message) => {
-      if (!message.isEncrypted || !message.content) return message;
+      if (!message.content || (!message.isEncrypted && !isEncryptedEnvelope(message.content))) return message;
       try {
         return { ...message, content: await decryptPrivateText(peer.publicKey, peer.salt, message.content) };
       } catch {
@@ -324,12 +340,6 @@ export async function decryptPrivateChatMessages(
   );
 }
 
-export function isEncryptedEnvelope(value: unknown): value is string {
-  if (typeof value !== "string" || value.length > 50_000) return false;
-  try {
-    const parsed = JSON.parse(value) as Partial<EncryptedEnvelope>;
-    return parsed.v === 1 && typeof parsed.iv === "string" && typeof parsed.ciphertext === "string";
-  } catch {
-    return false;
-  }
+export function isEncryptedEnvelope(value: unknown): boolean {
+  return parseEncryptedEnvelope(value) !== null;
 }

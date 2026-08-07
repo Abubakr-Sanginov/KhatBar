@@ -15,6 +15,26 @@ const INFO = new TextEncoder().encode("KhatBar private chat v1")
 type EncryptedEnvelope = { v: 1; iv: string; ciphertext: string }
 type GroupParticipant = { id: string; encryptionPublicKey?: string | null }
 
+export const ENCRYPTED_MESSAGE_KEY_UNAVAILABLE = "Encrypted message — key unavailable"
+export const ENCRYPTED_MESSAGE_DECRYPT_FAILED = "Encrypted message — unable to decrypt"
+
+function parseEncryptedEnvelope(value: unknown): EncryptedEnvelope | null {
+  let parsed: unknown = value
+  for (let depth = 0; depth < 2 && typeof parsed === "string"; depth += 1) {
+    if (parsed.length > 50_000) return null
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
+      return null
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null
+  const envelope = parsed as Partial<EncryptedEnvelope>
+  return envelope.v === 1 && typeof envelope.iv === "string" && typeof envelope.ciphertext === "string"
+    ? envelope as EncryptedEnvelope
+    : null
+}
+
 function bytesToBase64(bytes: Uint8Array) {
   let binary = ""
   for (const byte of bytes) binary += String.fromCharCode(byte)
@@ -123,8 +143,8 @@ export async function encryptPrivateText(userId: string, peerPublicKey: string, 
 }
 
 export async function decryptPrivateText(userId: string, peerPublicKey: string, salt: string, encoded: string) {
-  const envelope = JSON.parse(encoded) as EncryptedEnvelope
-  if (envelope.v !== 1 || !envelope.iv || !envelope.ciphertext) throw new Error("Invalid encrypted message")
+  const envelope = parseEncryptedEnvelope(encoded)
+  if (!envelope) throw new Error("Invalid encrypted message")
   const plaintext = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: base64ToBytes(envelope.iv) },
     await chatKey(userId, peerPublicKey, salt),
@@ -140,8 +160,8 @@ async function encryptWithKey(key: CryptoKey, plaintext: BufferSource) {
 }
 
 async function decryptWithKey(key: CryptoKey, encoded: string) {
-  const envelope = JSON.parse(encoded) as EncryptedEnvelope
-  if (envelope.v !== 1 || !envelope.iv || !envelope.ciphertext) throw new Error("Invalid encrypted message")
+  const envelope = parseEncryptedEnvelope(encoded)
+  if (!envelope) throw new Error("Invalid encrypted message")
   return crypto.subtle.decrypt(
     { name: "AES-GCM", iv: base64ToBytes(envelope.iv) }, key, base64ToBytes(envelope.ciphertext),
   )
@@ -212,13 +232,13 @@ export async function decryptPrivateChatMessages(chat: Chat, userId: string, mes
         try {
           return { ...message, content: new TextDecoder().decode(await decryptWithKey(key, message.content)) }
         } catch {
-          return { ...message, content: "Encrypted message — unable to decrypt" }
+          return { ...message, content: ENCRYPTED_MESSAGE_DECRYPT_FAILED }
         }
       }))
     } catch {
       return messages.map((message) =>
       message.isEncrypted || isEncryptedEnvelope(message.content)
-        ? { ...message, content: "Encrypted message — key unavailable" }
+        ? { ...message, content: ENCRYPTED_MESSAGE_KEY_UNAVAILABLE }
         : message,
     )
     }
@@ -229,7 +249,7 @@ export async function decryptPrivateChatMessages(chat: Chat, userId: string, mes
   } catch {
     return messages.map((message) =>
       message.isEncrypted || isEncryptedEnvelope(message.content)
-        ? { ...message, content: "Encrypted message — key unavailable" }
+        ? { ...message, content: ENCRYPTED_MESSAGE_KEY_UNAVAILABLE }
         : message,
     )
   }
@@ -238,17 +258,11 @@ export async function decryptPrivateChatMessages(chat: Chat, userId: string, mes
     try {
       return { ...message, content: await decryptPrivateText(userId, peer.publicKey, peer.salt, message.content) }
     } catch {
-      return { ...message, content: "Encrypted message — unable to decrypt" }
+      return { ...message, content: ENCRYPTED_MESSAGE_DECRYPT_FAILED }
     }
   }))
 }
 
-export function isEncryptedEnvelope(value: unknown): value is string {
-  if (typeof value !== "string" || value.length > 50_000) return false
-  try {
-    const parsed = JSON.parse(value) as Partial<EncryptedEnvelope>
-    return parsed.v === 1 && typeof parsed.iv === "string" && typeof parsed.ciphertext === "string"
-  } catch {
-    return false
-  }
+export function isEncryptedEnvelope(value: unknown): boolean {
+  return parseEncryptedEnvelope(value) !== null
 }

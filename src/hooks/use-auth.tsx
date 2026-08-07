@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => Promise<void>
   setUsername: (username: string) => Promise<void>
   updateUser: (patch: Partial<User>) => void
+  encryptionReady: number
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [encryptionReady, setEncryptionReady] = useState(0)
   const setToken = useSocketStore((s) => s.setToken)
 
   useEffect(() => {
@@ -42,7 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // non-exportable and remains in this browser's IndexedDB.
   useEffect(() => {
     if (!user?.id) return
-    publishPrivateChatIdentity(user.id).catch(() => {})
+    publishPrivateChatIdentity(user.id)
+      .then(() => setEncryptionReady((value) => value + 1))
+      .catch(() => {})
   }, [user?.id])
 
   const applyAuth = useCallback((data: { user: User; token?: string }) => {
@@ -97,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAdmin: user?.role === "ADMIN", login, register, logout, setUsername, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, isAdmin: user?.role === "ADMIN", login, register, logout, setUsername, updateUser, encryptionReady }}>
       {children}
     </AuthContext.Provider>
   )

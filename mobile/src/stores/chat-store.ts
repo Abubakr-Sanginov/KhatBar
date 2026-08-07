@@ -4,6 +4,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Chat, Message, ChatMember } from "../types";
 import { chatsApi } from "../api/chats";
 import type { CreateChatInput } from "../api/chats";
+import { decryptPrivateChatMessages, isEncryptedChat } from "../lib/e2ee";
+import { useAuthStore } from "./auth-store";
 
 type ChatListItem = Chat & {
   lastMessage?: Message | null;
@@ -48,7 +50,14 @@ export const useChatStore = create<ChatState>()(
     set({ isLoading: true });
     try {
       const res = await chatsApi.list();
-      set({ chats: res.chats, isLoading: false });
+      const userId = useAuthStore.getState().user?.id;
+      const chats = userId ? await Promise.all(res.chats.map(async (chat) => ({
+        ...chat,
+        lastMessage: chat.lastMessage && isEncryptedChat(chat)
+          ? (await decryptPrivateChatMessages(chat, userId, [chat.lastMessage]))[0]
+          : chat.lastMessage,
+      }))) : res.chats;
+      set({ chats, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
@@ -58,7 +67,14 @@ export const useChatStore = create<ChatState>()(
     set({ isRefreshing: true });
     try {
       const res = await chatsApi.list();
-      set({ chats: res.chats, isRefreshing: false });
+      const userId = useAuthStore.getState().user?.id;
+      const chats = userId ? await Promise.all(res.chats.map(async (chat) => ({
+        ...chat,
+        lastMessage: chat.lastMessage && isEncryptedChat(chat)
+          ? (await decryptPrivateChatMessages(chat, userId, [chat.lastMessage]))[0]
+          : chat.lastMessage,
+      }))) : res.chats;
+      set({ chats, isRefreshing: false });
     } catch {
       set({ isRefreshing: false });
     }

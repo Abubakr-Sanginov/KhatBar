@@ -76,7 +76,7 @@ export function ChatSidebar() {
   const localPeers = useLocalChatStore((s) => s.peers)
   const setLocalActiveChatId = useLocalChatStore((s) => s.setActiveChatId)
   useLocalChat()
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, logout, encryptionReady } = useAuth()
   const userId = user?.id
   const { isMobileSidebarOpen, toggleSidebar } = useUIStore()
   const router = useRouter()
@@ -98,7 +98,7 @@ export function ChatSidebar() {
     return () => {
       cancelled = true
     }
-  }, [setChats, userId])
+  }, [setChats, userId, encryptionReady])
 
   // Public discovery runs alongside the local filter, so a search finds both
   // chats you are in and public ones you could join. Results carry the query
@@ -272,8 +272,7 @@ export function ChatSidebar() {
 
         <ScrollArea className="flex-1 px-2">
           <div className="space-y-0.5 pb-2">
-            {localChats.length > 0 && (
-              <>
+            <>
                 <div className="flex items-center justify-between px-3 pb-1 pt-3">
                   <p className="flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
                     <Radio className="h-3.5 w-3.5" /> Local
@@ -335,7 +334,6 @@ export function ChatSidebar() {
                   )
                 })}
               </>
-            )}
 
             {filtered.length === 0 && discoverable.length === 0 && !searchingPublic && (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
