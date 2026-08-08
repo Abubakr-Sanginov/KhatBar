@@ -185,8 +185,8 @@ export class LocalSyncEngine {
     return this.transport.createPairingCode()
   }
 
-  joinPairingCode(code: string): void {
-    this.transport.joinPairingCode(code)
+  joinPairingCode(code: string): Promise<void> {
+    return this.transport.joinPairingCode(code)
   }
 
   dispose(): void {

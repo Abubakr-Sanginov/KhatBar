@@ -67,7 +67,7 @@ export function useLocalChat() {
     },
     joinPairingCode: async (code: string) => {
       const engine = getLocalEngine() ?? await startLocalEngine()
-      engine.joinPairingCode(code)
+      return engine.joinPairingCode(code)
     },
     retry: () => startLocalEngine(true),
   }

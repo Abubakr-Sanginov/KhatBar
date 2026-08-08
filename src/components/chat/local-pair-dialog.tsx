@@ -28,9 +28,19 @@ export function LocalPairDialog({
   const [pairingState, setPairingState] = useState<"idle" | "waiting" | "done" | "error">("idle")
   const [pairingError, setPairingError] = useState<string | null>(null)
   const [ownCode, setOwnCode] = useState<string | null>(null)
+  const [codeState, setCodeState] = useState<"idle" | "pending" | "success" | "error">("idle")
 
   const pairedIds = new Set(chats.map((c) => c.peerId))
   const discoverable = Object.values(peers).filter((p) => p.id !== deviceId && !pairedIds.has(p.id))
+
+  const normalizedCode = code.trim().toUpperCase()
+  const validCode = /^[A-HJ-NP-Z2-9]{8}$/.test(normalizedCode)
+
+  async function joinCode() {
+    setCodeState("pending"); setPairingError(null)
+    try { await joinPairingCode(normalizedCode); setCodeState("success") }
+    catch (cause) { setCodeState("error"); setPairingError(cause instanceof Error ? cause.message : "Could not join code") }
+  }
 
   async function pairPeer(peer: LocalPeer) {
     setPairingPeer(peer)
@@ -137,16 +147,19 @@ export function LocalPairDialog({
           <Input
             placeholder="Pairing code (from other device)"
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onChange={(e) => { setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)); setCodeState("idle"); setPairingError(null) }}
+            maxLength={8}
           />
           <Button
             variant="secondary"
-            disabled={code.length < 4}
-            onClick={() => void joinPairingCode(code).catch((cause) => setPairingError(cause instanceof Error ? cause.message : "Could not join code"))}
+            disabled={!validCode || codeState === "pending"}
+            onClick={() => void joinCode()}
           >
-            Connect
+            {codeState === "pending" ? <Loader2 className="h-4 w-4 animate-spin" /> : codeState === "success" ? <Check className="h-4 w-4" /> : "Connect"}
           </Button>
         </div>
+        {codeState === "success" && <p className="text-sm text-emerald-600">Pairing completed successfully.</p>}
+        {pairingError && <p className="text-sm text-destructive">{pairingError}</p>}
       </DialogContent>
     </Dialog>
   )

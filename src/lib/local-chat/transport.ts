@@ -29,7 +29,9 @@ export class LocalTransport {
   private myName = ""
   private myPublicKey = ""
   private socket: Socket | null = null
-  private socketHandlers: Array<[string, (...args: any[]) => void]> = []
+  private socketHandlers: Array<[string, Parameters<Socket["on"]>[1]]> = []
+  private socketWatch: ReturnType<typeof setInterval> | null = null
+  private pendingPairing = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
 
   /** WebRTC peer connections: deviceId -> RTCPeerConnection */
   private pcs = new Map<string, RTCPeerConnection>()
@@ -55,6 +57,7 @@ export class LocalTransport {
       }
     }
     this.attachSocket()
+    this.socketWatch = setInterval(() => { if (getSocket() !== this.socket) this.attachSocket() }, 500)
     this.broadcastHello()
   }
 
@@ -63,39 +66,22 @@ export class LocalTransport {
   }
 
   private attachSocket(): void {
-    this.socket = getSocket()
+    const next = getSocket()
+    if (next === this.socket) return
+    this.socketHandlers.forEach(([event, handler]) => this.socket?.off(event, handler))
+    this.socketHandlers = []
+    this.socket = next
     if (!this.socket) return
-    const register = () => {
-      this.socket?.emit("local:register", this.profile())
-      const peerIds = Array.from(this.pcs.keys()).filter((id) => id && !id.startsWith("pairing-") && !id.startsWith("pending:"))
-      this.socket?.emit("local:discover", { deviceId: this.myDeviceId, peerIds })
-    }
-    const onOffer = async ({ code, offer, peer }: { code: string; offer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => {
-      const answer = await this.acceptPairingOffer(code, offer)
-      this.socket?.emit("local:pair:answer", { code, answer, profile: this.profile() })
-      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
-    }
-    const onAnswer = async ({ code, answer, peer }: { code: string; answer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => {
-      await this.acceptPairingAnswer(code, answer)
-      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
-    }
-    const onOnline = ({ peer }: { peer: { deviceId: string; name: string; publicKey: string } }) => {
-      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
-    }
+    const register = () => { this.socket?.emit("local:register", this.profile()); this.socket?.emit("local:discover", { deviceId: this.myDeviceId, peerIds: Array.from(this.pcs.keys()).filter((id) => id && !id.startsWith("pairing-") && !id.startsWith("pending:")) }) }
+    const onOffer = async ({ code, offer, peer }: { code: string; offer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => { const answer = await this.acceptPairingOffer(code, offer); this.socket?.emit("local:pair:answer", { code, answer, profile: this.profile() }); this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId) }
+    const onAnswer = async ({ code, answer, peer }: { code: string; answer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => { await this.acceptPairingAnswer(code, answer); this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId) }
+    const onOnline = ({ peer }: { peer: { deviceId: string; name: string; publicKey: string } }) => this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
     const onSignal = ({ fromDeviceId, payload }: { fromDeviceId: string; payload: WireMessage }) => this.sink(payload, fromDeviceId)
-    this.socketHandlers = [["connect", register], ["local:pair:offer", onOffer], ["local:pair:answer", onAnswer], ["local:peer:online", onOnline], ["local:signal", onSignal]]
+    const settle = ({ code, error }: { code: string; error?: string }) => this.settlePairing(code, error ? new Error(error) : undefined)
+    const complete = ({ code, peer }: { code: string; peer: { deviceId: string; name: string; publicKey: string } }) => { this.bindChannelPeerId(peer.deviceId); this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId); this.settlePairing(code) }
+    this.socketHandlers = [["connect", register], ["local:pair:offer", onOffer], ["local:pair:answer", onAnswer], ["local:pair:created", settle], ["local:pair:complete", complete], ["local:pair:error", settle], ["local:peer:online", onOnline], ["local:signal", onSignal]]
     this.socketHandlers.forEach(([event, handler]) => this.socket?.on(event, handler))
-    register()
-  }
-
-  async createPairingCode(): Promise<string> {
-    const { code, offer } = await this.createPairingOffer()
-    this.socket?.emit("local:pair:create", { code, offer, profile: this.profile() })
-    return code
-  }
-
-  joinPairingCode(code: string): void {
-    this.socket?.emit("local:pair:join", { code: code.trim().toUpperCase(), profile: this.profile() })
+    if (this.socket.connected) register()
   }
 
   private broadcastHello(): void {
@@ -107,6 +93,46 @@ export class LocalTransport {
     }
     this.channel?.postMessage(hello)
   }
+
+  private settlePairing(code: string, error?: Error): void {
+    const pending = this.pendingPairing.get(code)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.pendingPairing.delete(code)
+    if (error) pending.reject(error)
+    else pending.resolve()
+  }
+
+  private connectedSocket(): Socket {
+    this.attachSocket()
+    if (!this.socket) {
+      throw new Error("╨б╨╡╤А╨▓╨╡╤А ╤Б╨╛╨┐╤А╤П╨╢╨╡╨╜╨╕╤П ╨╜╨╡╨┤╨╛╤Б╤В╤Г╨┐╨╡╨╜. ╨Т╨╛╨╣╨┤╨╕╤В╨╡ ╨▓ ╨░╨║╨║╨░╤Г╨╜╤В ╨╕ ╨┐╨╛╨┐╤А╨╛╨▒╤Г╨╣╤В╨╡ ╤Б╨╜╨╛╨▓╨░.")
+    }
+    if (!this.socket.connected) {
+      throw new Error("╨Э╨╡╤В ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П ╤Б ╤Б╨╡╤А╨▓╨╡╤А╨╛╨╝ ╤Б╨╛╨┐╤А╤П╨╢╨╡╨╜╨╕╤П. ╨Я╤А╨╛╨▓╨╡╤А╤М╤В╨╡ ╤Б╨╡╤В╤М ╨╕ ╨┐╨╛╨┐╤А╨╛╨▒╤Г╨╣╤В╨╡ ╤Б╨╜╨╛╨▓╨░.")
+    }
+    return this.socket
+  }
+
+  private waitForPairing(code: string, send: (socket: Socket) => void): Promise<void> {
+    const socket = this.connectedSocket()
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.settlePairing(code, new Error("╨Т╤А╨╡╨╝╤П ╨╛╨╢╨╕╨┤╨░╨╜╨╕╤П ╤Б╨╛╨┐╤А╤П╨╢╨╡╨╜╨╕╤П ╨╕╤Б╤В╨╡╨║╨╗╨╛. ╨Я╤А╨╛╨▓╨╡╤А╤М╤В╨╡ ╨║╨╛╨┤ ╨╕ ╨┐╨╛╨┐╤А╨╛╨▒╤Г╨╣╤В╨╡ ╤Б╨╜╨╛╨▓╨░."))
+      }, 30000)
+      this.pendingPairing.set(code, { resolve, reject, timer })
+      try {
+        send(socket)
+      } catch (cause) {
+        this.settlePairing(
+          code,
+          cause instanceof Error ? cause : new Error("╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╤М ╨╖╨░╨┐╤А╨╛╤Б ╨╜╨░ ╤Б╨╛╨┐╤А╤П╨╢╨╡╨╜╨╕╨╡."),
+        )
+      }
+    })
+  }
+  async createPairingCode(): Promise<string> { this.connectedSocket(); const { code, offer } = await this.createPairingOffer(); await this.waitForPairing(code, (socket) => socket.emit("local:pair:create", { code, offer, profile: this.profile() })); return code }
+  joinPairingCode(code: string): Promise<void> { const normalized = code.trim().toUpperCase(); return this.waitForPairing(normalized, (socket) => socket.emit("local:pair:join", { code: normalized, profile: this.profile() })) }
 
   /** Send to a peer over every open channel. Returns true if at least one went through. */
   send(peerId: string, msg: WireMessage): boolean {
@@ -172,9 +198,8 @@ export class LocalTransport {
   /** Device B: accept an offer, returns the answer JSON to send back. */
   async acceptPairingOffer(code: string, offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
     const pc = this.newPeerConnection()
+    pc.ondatachannel = (event) => this.attachDataChannel(event.channel, "")
     await pc.setRemoteDescription(offer)
-    const dc = pc.createDataChannel("khatbar")
-    this.attachDataChannel(dc, "")
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     this.pendingAnswers.set(code, {
@@ -262,6 +287,10 @@ export class LocalTransport {
   }
 
   dispose(): void {
+    if (this.socketWatch) clearInterval(this.socketWatch)
+    this.socketWatch = null
+    this.pendingPairing.forEach(({ reject, timer }) => { clearTimeout(timer); reject(new Error("Pairing was cancelled")) })
+    this.pendingPairing.clear()
     this.socketHandlers.forEach(([event, handler]) => this.socket?.off(event, handler))
     this.socketHandlers = []
     this.socket = null
