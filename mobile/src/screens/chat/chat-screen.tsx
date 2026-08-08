@@ -37,7 +37,8 @@ import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
 import type { ThemeColors } from "../../theme/colors";
 import { formatMessageTime } from "../../lib/utils";
 import type { Message, Chat } from "../../types";
-import { ArrowUp } from "lucide-react-native";
+import { ArrowUp, Phone, Video } from "lucide-react-native";
+import { useCall } from "../../hooks/use-call";
 import { MediaMessage } from "../../components/chat/media-message";
 import { MediaPicker } from "../../components/chat/media-picker";
 import { VoiceRecorder } from "../../components/chat/voice-recorder";
@@ -206,6 +207,7 @@ export default function ChatScreen({ route, navigation }: any) {
   const flatListRef = useRef<FlatList>(null);
   const [isSending, setIsSending] = useState(false);
   const [activeChat, setActiveChat] = useState<(Chat & { members: any[] }) | null>(null);
+  const { startCall } = useCall();
 
   useEffect(() => {
     chatsApi.get(chatId).then((res) => {
@@ -238,6 +240,14 @@ export default function ChatScreen({ route, navigation }: any) {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <TouchableOpacity onPress={() => {
+            const targetIds = activeChat?.members.filter((member: any) => member.userId !== user?.id).map((member: any) => member.userId) ?? [];
+            void startCall(chatId, chatName, "voice", activeChat?.type !== "PRIVATE", targetIds).then(() => navigation.getParent()?.getParent()?.navigate("Call"));
+          }}><Phone size={20} color={colors.text} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => {
+            const targetIds = activeChat?.members.filter((member: any) => member.userId !== user?.id).map((member: any) => member.userId) ?? [];
+            void startCall(chatId, chatName, "video", activeChat?.type !== "PRIVATE", targetIds).then(() => navigation.getParent()?.getParent()?.navigate("Call"));
+          }}><Video size={20} color={colors.text} /></TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
               Alert.alert("Delete chat", "Delete this conversation?", [
@@ -416,7 +426,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  gradientOverlay: { ...StyleSheet.absoluteFillObject },
+  gradientOverlay: { ...StyleSheet.absoluteFill },
   messagesList: { paddingHorizontal: 12, paddingTop: 8 },
   messageBubble: {
     maxWidth: "78%",

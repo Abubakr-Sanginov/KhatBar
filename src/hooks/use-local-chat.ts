@@ -61,6 +61,14 @@ export function useLocalChat() {
       await engine.setPeerKey(peer.id, peer.publicKey)
       return chat
     },
+    createPairingCode: async () => {
+      const engine = getLocalEngine() ?? await startLocalEngine()
+      return engine.createPairingCode()
+    },
+    joinPairingCode: async (code: string) => {
+      const engine = getLocalEngine() ?? await startLocalEngine()
+      engine.joinPairingCode(code)
+    },
     retry: () => startLocalEngine(true),
   }
 }

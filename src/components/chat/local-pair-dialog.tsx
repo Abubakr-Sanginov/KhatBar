@@ -22,11 +22,12 @@ export function LocalPairDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { ready, status, error, peers, chats, deviceId } = useLocalChatStore()
-  const { pair, retry } = useLocalChat()
+  const { pair, createPairingCode, joinPairingCode, retry } = useLocalChat()
   const [code, setCode] = useState("")
   const [pairingPeer, setPairingPeer] = useState<LocalPeer | null>(null)
   const [pairingState, setPairingState] = useState<"idle" | "waiting" | "done" | "error">("idle")
   const [pairingError, setPairingError] = useState<string | null>(null)
+  const [ownCode, setOwnCode] = useState<string | null>(null)
 
   const pairedIds = new Set(chats.map((c) => c.peerId))
   const discoverable = Object.values(peers).filter((p) => p.id !== deviceId && !pairedIds.has(p.id))
@@ -122,6 +123,16 @@ export function LocalPairDialog({
           </ScrollArea>
         )}
 
+        {ready && (
+          <div className="rounded-xl border border-border p-3 text-center">
+            <p className="mb-2 text-xs text-muted-foreground">Create a short code for the other device</p>
+            {ownCode && <p className="mb-2 font-mono text-2xl font-semibold tracking-widest">{ownCode}</p>}
+            <Button variant="secondary" onClick={() => void createPairingCode().then(setOwnCode).catch((cause) => setPairingError(cause instanceof Error ? cause.message : "Could not create code"))}>
+              {ownCode ? "Create new code" : "Create code"}
+            </Button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 pt-2">
           <Input
             placeholder="Pairing code (from other device)"
@@ -130,11 +141,8 @@ export function LocalPairDialog({
           />
           <Button
             variant="secondary"
-            disabled={code.length < 6}
-            onClick={() => {
-              const peer = Object.values(peers).find((p) => p.name.includes(code.slice(0, 4)))
-              if (peer) void pairPeer(peer)
-            }}
+            disabled={code.length < 4}
+            onClick={() => void joinPairingCode(code).catch((cause) => setPairingError(cause instanceof Error ? cause.message : "Could not join code"))}
           >
             Connect
           </Button>

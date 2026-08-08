@@ -177,16 +177,16 @@ export function useLocalChat() {
     await engineRef.current?.sendMessage(chatId, peerId, content);
   }, []);
 
-  const createOffer = useCallback(async () => {
-    return transportRef.current?.createPairingOffer();
+  const createPairingCode = useCallback(async () => {
+    const transport = transportRef.current;
+    if (!transport) throw new Error("Local transport is not ready");
+    return transport.createPairingCode();
   }, []);
 
-  const acceptOffer = useCallback(async (code: string, offer: any) => {
-    return transportRef.current?.acceptPairingOffer(code, offer);
-  }, []);
-
-  const acceptAnswer = useCallback(async (code: string, answer: any) => {
-    return transportRef.current?.acceptPairingAnswer(code, answer);
+  const joinPairingCode = useCallback((code: string) => {
+    const transport = transportRef.current;
+    if (!transport) throw new Error("Local transport is not ready");
+    transport.joinPairingCode(code);
   }, []);
 
   const deleteChat = useCallback(async (chatId: string) => {
@@ -204,9 +204,8 @@ export function useLocalChat() {
     activeChatId,
     pair,
     sendLocalMessage,
-    createOffer,
-    acceptOffer,
-    acceptAnswer,
+    createPairingCode,
+    joinPairingCode,
     deleteChat,
     setActiveChatId,
   }), [ready, deviceId, deviceName, chats, messages, peers, activeChatId]);

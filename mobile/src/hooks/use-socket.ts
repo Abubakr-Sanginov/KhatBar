@@ -132,7 +132,7 @@ export function useSocket() {
       callId: string;
       chatId: string;
       mode: string;
-      isGroup: boolean;
+      targetIds: string[];
     }) => emit("call:invite", data),
     [emit]
   );
@@ -153,7 +153,7 @@ export function useSocket() {
   );
 
   const sendCallSignal = useCallback(
-    (data: { callId: string; to: string; signal: any }) =>
+    (data: { callId: string; targetId: string; payload: any }) =>
       emit("call:signal", data),
     [emit]
   );

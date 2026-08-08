@@ -9,6 +9,150 @@ const userSockets = new Map<string, Set<string>>()
 const disconnectGraceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const DISCONNECT_GRACE_MS = 20_000
 
+interface LocalDeviceProfile {
+  deviceId: string
+  name: string
+  publicKey: string
+}
+
+interface LocalPairingSession {
+  code: string
+  ownerUserId: string
+  ownerSocketId: string
+  owner: LocalDeviceProfile
+  offer: unknown
+  expiresAt: number
+}
+
+const localDevices = new Map<string, { userId: string; socketId: string; profile: LocalDeviceProfile }>()
+const localPairingSessions = new Map<string, LocalPairingSession>()
+const LOCAL_PAIRING_TTL_MS = 120_000
+const LOCAL_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{4,12}$/
+
+function normalizeLocalCode(value: unknown): string {
+  return typeof value === "string" ? value.trim().toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "") : ""
+}
+
+function validLocalProfile(value: unknown): value is LocalDeviceProfile {
+  if (!value || typeof value !== "object") return false
+  const profile = value as Partial<LocalDeviceProfile>
+  return typeof profile.deviceId === "string" && profile.deviceId.length <= 128 &&
+    typeof profile.name === "string" && profile.name.length <= 128 &&
+    typeof profile.publicKey === "string" && profile.publicKey.length <= 16_000
+}
+
+function pruneLocalPairingSessions() {
+  const now = Date.now()
+  for (const [code, session] of localPairingSessions) {
+    if (session.expiresAt <= now || !io?.sockets.sockets.has(session.ownerSocketId)) {
+      localPairingSessions.delete(code)
+    }
+  }
+}
+
+function registerLocalChatHandlers(socket: AuthedSocket) {
+  const userId = socket.user.id
+
+  socket.on("local:register", (profile: unknown) => {
+    if (!validLocalProfile(profile)) return
+    localDevices.set(profile.deviceId, { userId, socketId: socket.id, profile })
+    socket.emit("local:registered", { deviceId: profile.deviceId })
+  })
+
+  socket.on("local:pair:create", (data: { code?: unknown; offer?: unknown; profile?: unknown }) => {
+    pruneLocalPairingSessions()
+    const code = normalizeLocalCode(data?.code)
+    if (!LOCAL_CODE_PATTERN.test(code) || !validLocalProfile(data?.profile) || !data?.offer) {
+      socket.emit("local:pair:error", { code, error: "Invalid pairing request" })
+      return
+    }
+    const existing = localPairingSessions.get(code)
+    if (existing && existing.ownerSocketId !== socket.id) {
+      socket.emit("local:pair:error", { code, error: "This code is already in use" })
+      return
+    }
+    localDevices.set(data.profile.deviceId, { userId, socketId: socket.id, profile: data.profile })
+    localPairingSessions.set(code, {
+      code,
+      ownerUserId: userId,
+      ownerSocketId: socket.id,
+      owner: data.profile,
+      offer: data.offer,
+      expiresAt: Date.now() + LOCAL_PAIRING_TTL_MS,
+    })
+    socket.emit("local:pair:created", { code, expiresAt: Date.now() + LOCAL_PAIRING_TTL_MS })
+  })
+
+  socket.on("local:pair:join", (data: { code?: unknown; profile?: unknown }) => {
+    pruneLocalPairingSessions()
+    const code = normalizeLocalCode(data?.code)
+    const session = localPairingSessions.get(code)
+    if (!session || !validLocalProfile(data?.profile)) {
+      socket.emit("local:pair:error", { code, error: "Pairing code was not found or expired" })
+      return
+    }
+    if (session.ownerSocketId === socket.id || session.owner.deviceId === data.profile.deviceId) {
+      socket.emit("local:pair:error", { code, error: "You cannot pair this device with itself" })
+      return
+    }
+    localDevices.set(data.profile.deviceId, { userId, socketId: socket.id, profile: data.profile })
+    socket.emit("local:pair:offer", { code, offer: session.offer, peer: session.owner })
+  })
+
+  socket.on("local:pair:answer", (data: { code?: unknown; answer?: unknown; profile?: unknown }) => {
+    pruneLocalPairingSessions()
+    const code = normalizeLocalCode(data?.code)
+    const session = localPairingSessions.get(code)
+    if (!session || !validLocalProfile(data?.profile) || !data?.answer) {
+      socket.emit("local:pair:error", { code, error: "Pairing session was not found or expired" })
+      return
+    }
+    io?.sockets.sockets.get(session.ownerSocketId)?.emit("local:pair:answer", {
+      code,
+      answer: data.answer,
+      peer: data.profile,
+    })
+    socket.emit("local:pair:complete", { code, peer: session.owner })
+    localPairingSessions.delete(code)
+  })
+
+  socket.on("local:discover", (data: { deviceId?: unknown; peerIds?: unknown }) => {
+    if (typeof data?.deviceId !== "string" || !Array.isArray(data?.peerIds)) return
+    const requester = localDevices.get(data.deviceId)
+    if (!requester || requester.socketId !== socket.id) return
+    for (const peerId of data.peerIds.slice(0, 200)) {
+      if (typeof peerId !== "string") continue
+      const peer = localDevices.get(peerId)
+      if (!peer || peer.socketId === socket.id) continue
+      socket.emit("local:peer:online", { peer: peer.profile })
+      io?.sockets.sockets.get(peer.socketId)?.emit("local:peer:online", { peer: requester.profile })
+    }
+  })
+
+  socket.on("local:signal", (data: { targetDeviceId?: unknown; payload?: unknown }) => {
+    if (!allowSignal(socket.id) || typeof data?.targetDeviceId !== "string" || !data?.payload) return
+    const target = localDevices.get(data.targetDeviceId)
+    if (!target) return
+    targetSocket(target.socketId)?.emit("local:signal", {
+      fromDeviceId: [...localDevices.values()].find((entry) => entry.socketId === socket.id)?.profile.deviceId,
+      payload: data.payload,
+    })
+  })
+}
+
+function targetSocket(socketId: string) {
+  return io?.sockets.sockets.get(socketId)
+}
+
+function unregisterLocalDevices(socketId: string) {
+  for (const [deviceId, entry] of localDevices) {
+    if (entry.socketId === socketId) localDevices.delete(deviceId)
+  }
+  for (const [code, session] of localPairingSessions) {
+    if (session.ownerSocketId === socketId) localPairingSessions.delete(code)
+  }
+}
+
 interface CallPeer {
   id: string
   username: string | null
@@ -451,28 +595,31 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>) {
       socket.broadcast.emit("presence:update", { userId, status: "ONLINE" })
     }
 
-    socket.on("disconnect", async () => {
+    registerLocalChatHandlers(socket as AuthedSocket)
+
+    socket.on("disconnect", () => {
       releaseBucket(socket.id)
-      userSockets.get(userId)?.delete(socket.id)
-      const stillOnline = (userSockets.get(userId)?.size ?? 0) > 0
-      if (!stillOnline) {
-        // A screen-share permission prompt or a short network hiccup can
-        // reconnect the socket. Keep the call alive during that window.
-        clearDisconnectGrace(userId)
-        disconnectGraceTimers.set(userId, setTimeout(() => {
-          if (isUserOnline(userId)) return
-          userSockets.delete(userId)
-          userProfiles.delete(userId)
-          leaveAllCalls(userId)
-          disconnectGraceTimers.delete(userId)
-        }, DISCONNECT_GRACE_MS))
-      }
-      getPrisma()
-        .user.update({ where: { id: userId }, data: { status: "OFFLINE", lastSeen: new Date() } })
-        .catch(() => {})
-      if (user.privacyShowStatus) {
-        socket.broadcast.emit("presence:update", { userId, status: "OFFLINE" })
-      }
+      unregisterLocalDevices(socket.id)
+      const sockets = userSockets.get(userId)
+      sockets?.delete(socket.id)
+      if (sockets && sockets.size === 0) userSockets.delete(userId)
+      if (isUserOnline(userId)) return
+
+      // Keep calls and presence alive through short network interruptions.
+      clearDisconnectGrace(userId)
+      disconnectGraceTimers.set(userId, setTimeout(() => {
+        disconnectGraceTimers.delete(userId)
+        if (isUserOnline(userId)) return
+        userSockets.delete(userId)
+        userProfiles.delete(userId)
+        leaveAllCalls(userId)
+        getPrisma()
+          .user.update({ where: { id: userId }, data: { status: "OFFLINE", lastSeen: new Date() } })
+          .catch(() => {})
+        if (user.privacyShowStatus) {
+          io?.emit("presence:update", { userId, status: "OFFLINE" })
+        }
+      }, DISCONNECT_GRACE_MS))
     })
 
     socket.on("join:chat", async (chatId: string) => {

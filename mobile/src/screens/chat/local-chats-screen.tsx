@@ -20,6 +20,7 @@ export default function LocalChatsScreen({ navigation }: any) {
   const handleOpen = (chat: LocalChat) => {
     setActiveChatId(chat.id);
     navigation.navigate("LocalChat", {
+      chatId: chat.id,
       peerId: chat.peerId,
       peerName: chat.peerName,
     });
@@ -31,7 +32,7 @@ export default function LocalChatsScreen({ navigation }: any) {
 
   const renderItem = ({ item }: { item: LocalChat }) => {
     const peer = peers[item.peerId];
-    const lastMsg = messages[item.peerId]?.slice(-1)[0];
+    const lastMsg = messages[item.id]?.slice(-1)[0];
 
     return (
       <TouchableOpacity

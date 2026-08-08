@@ -10,8 +10,9 @@ let Zeroconf: any = null;
 try {
   Zeroconf = require("react-native-zeroconf").default;
 } catch {}
+import type { Socket } from "socket.io-client";
+import { getSocketInstance } from "../../socket/socket";
 import type { WireMessage, DeviceIdentity } from "./types";
-import { bytesToBase64 } from "./crypto";
 
 const SERVICE_TYPE = "khatbar";
 const SERVICE_PORT = 18900;
@@ -31,6 +32,8 @@ export class LocalTransport {
   private advertised = false;
   private onPeerOffline: ((peerId: string) => void) | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private socket: Socket | null = null;
+  private socketHandlers: Array<[string, (...args: any[]) => void]> = [];
 
   constructor(sink: WireSink, onPeerOffline?: (peerId: string) => void) {
     this.sink = sink;
@@ -46,6 +49,7 @@ export class LocalTransport {
       return;
     }
     this.myIdentity = identity;
+    this.attachSocket();
 
     this.zeroconf.on("found", (name: string, type: string, domain: string) => {
       if (type !== SERVICE_TYPE) return;
@@ -107,6 +111,51 @@ export class LocalTransport {
     this.pendingAnswers.clear();
     this.lastSeen.forEach((t) => clearTimeout(t));
     this.lastSeen.clear();
+    this.socketHandlers.forEach(([event, handler]) => this.socket?.off(event, handler));
+    this.socketHandlers = [];
+    this.socket = null;
+  }
+
+  private profile() {
+    if (!this.myIdentity) throw new Error("Local identity is not ready");
+    return { deviceId: this.myIdentity.deviceId, name: this.myIdentity.name, publicKey: this.myIdentity.publicKey };
+  }
+
+  private attachSocket() {
+    this.socket = getSocketInstance();
+    if (!this.socket) return;
+    const register = () => {
+      if (!this.myIdentity) return;
+      this.socket?.emit("local:register", this.profile());
+      const peerIds = Array.from(this.pcs.keys()).filter((id) => id && !id.startsWith("pairing-") && !id.startsWith("pending:"));
+      this.socket?.emit("local:discover", { deviceId: this.myIdentity.deviceId, peerIds });
+    };
+    const onOffer = async ({ code, offer, peer }: any) => {
+      const answer = await this.acceptPairingOffer(code, offer);
+      this.socket?.emit("local:pair:answer", { code, answer, profile: this.profile() });
+      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId);
+    };
+    const onAnswer = async ({ code, answer, peer }: any) => {
+      await this.acceptPairingAnswer(code, answer);
+      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId);
+    };
+    const onOnline = ({ peer }: any) => this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId);
+    const onSignal = ({ fromDeviceId, payload }: any) => this.sink(payload, fromDeviceId);
+    this.socketHandlers = [["connect", register], ["local:pair:offer", onOffer], ["local:pair:answer", onAnswer], ["local:peer:online", onOnline], ["local:signal", onSignal]];
+    this.socketHandlers.forEach(([event, handler]) => this.socket?.on(event, handler));
+    register();
+  }
+
+  async createPairingCode(): Promise<string> {
+    if (!this.socket) throw new Error("Server connection is not ready");
+    const { code, offer } = await this.createPairingOffer();
+    this.socket.emit("local:pair:create", { code, offer, profile: this.profile() });
+    return code;
+  }
+
+  joinPairingCode(code: string): void {
+    if (!this.socket) throw new Error("Server connection is not ready");
+    this.socket.emit("local:pair:join", { code: code.trim().toUpperCase(), profile: this.profile() });
   }
 
   send(peerId: string, msg: WireMessage): boolean {
@@ -241,9 +290,8 @@ export class LocalTransport {
   private randomCode(): string {
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
-    const bytes = new Uint8Array(8);
-    for (let i = 0; i < bytes.length; i++) {
-      code += alphabet[bytes[i] % alphabet.length];
+    for (let i = 0; i < 8; i++) {
+      code += alphabet[Math.floor(Math.random() * alphabet.length)];
     }
     return code;
   }

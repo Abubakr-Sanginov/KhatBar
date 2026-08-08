@@ -73,12 +73,20 @@ export const useLocalChatStore = create<LocalChatState>()(
       setMessages: (chatId, messages) =>
         set((s) => ({ messages: { ...s.messages, [chatId]: messages } })),
       appendMessage: (message) =>
-        set((s) => ({
-          messages: {
-            ...s.messages,
-            [message.chatId]: [...(s.messages[message.chatId] ?? []), message],
-          },
-        })),
+        set((s) => {
+          const current = s.messages[message.chatId] ?? []
+          const messages = current.some((item) => item.id === message.id)
+            ? current.map((item) => item.id === message.id ? { ...item, ...message } : item)
+            : [...current, message]
+          return {
+            messages: { ...s.messages, [message.chatId]: messages },
+            chats: s.chats
+              .map((chat) => chat.id === message.chatId
+                ? { ...chat, updatedAt: Math.max(chat.updatedAt, message.createdAt) }
+                : chat)
+              .sort((a, b) => b.updatedAt - a.updatedAt),
+          }
+        }),
       setActiveChatId: (activeChatId) => set({ activeChatId }),
       setPairingCode: (pairingCode) => set({ pairingCode }),
     }),

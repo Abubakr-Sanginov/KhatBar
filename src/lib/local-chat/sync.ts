@@ -181,6 +181,14 @@ export class LocalSyncEngine {
     return this.onlinePeers.has(peerId)
   }
 
+  createPairingCode(): Promise<string> {
+    return this.transport.createPairingCode()
+  }
+
+  joinPairingCode(code: string): void {
+    this.transport.joinPairingCode(code)
+  }
+
   dispose(): void {
     this.transport.dispose()
     this.onlinePeers.clear()

@@ -15,6 +15,7 @@ import Animated, {
   FadeInUp,
   FadeIn,
   SlideInRight,
+  ZoomIn,
   useSharedValue,
   useAnimatedStyle,
   withSpring,

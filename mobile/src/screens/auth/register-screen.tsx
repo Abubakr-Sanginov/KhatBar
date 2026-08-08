@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  type TextInputProps,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -37,7 +38,7 @@ function AnimatedInput({
   onChangeText: (t: string) => void;
   secureTextEntry?: boolean;
   keyboardType?: any;
-  autoComplete?: string;
+  autoComplete?: TextInputProps["autoComplete"];
   autoCapitalize?: any;
   colors: ThemeColors;
   delay: number;
@@ -51,7 +52,7 @@ function AnimatedInput({
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(400)}>
       <TextInput
-        style={[authStyles.input, { backgroundColor: colors.inputBg, color: colors.text }, animatedStyle]}
+        style={[authStyles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: focused ? colors.primary : "transparent" }]}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         value={value}

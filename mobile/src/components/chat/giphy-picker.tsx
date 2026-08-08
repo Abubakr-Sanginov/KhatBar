@@ -80,7 +80,7 @@ export function GiphyPicker({ onGifSelect }: GiphyPickerProps) {
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="none" onRequestClose={() => setVisible(false)}>
-        <Pressable style={styles.overlay} activeOpacity={1} onPress={() => setVisible(false)}>
+        <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
           <Animated.View
             entering={SlideInUp.duration(300)}
             exiting={SlideOutDown.duration(200)}

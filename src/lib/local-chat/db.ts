@@ -144,7 +144,9 @@ export async function putLocalMessage(message: LocalMessage): Promise<void> {
   const db = await openDb()
   const tx = db.transaction(["messages", "chats"], "readwrite")
   tx.objectStore("messages").put(message)
-  tx.objectStore("chats").put({ ...message, id: message.chatId } as unknown as LocalChat)
+  const chats = tx.objectStore("chats")
+  const chat = (await reqToPromise(chats.get(message.chatId))) as LocalChat | undefined
+  if (chat) chats.put({ ...chat, updatedAt: Math.max(chat.updatedAt, message.createdAt) })
   await txDone(tx)
 }
 

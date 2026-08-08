@@ -10,6 +10,8 @@
  *       A: acceptPairingAnswer(code, answerJson)
  */
 
+import type { Socket } from "socket.io-client"
+import { getSocket } from "@/lib/socket-client"
 import type { WireMessage } from "./types"
 import { LOCAL_CHAT_BEACON } from "./types"
 
@@ -26,6 +28,8 @@ export class LocalTransport {
   private myDeviceId = ""
   private myName = ""
   private myPublicKey = ""
+  private socket: Socket | null = null
+  private socketHandlers: Array<[string, (...args: any[]) => void]> = []
 
   /** WebRTC peer connections: deviceId -> RTCPeerConnection */
   private pcs = new Map<string, RTCPeerConnection>()
@@ -50,7 +54,48 @@ export class LocalTransport {
         this.sink(msg, msg.deviceId)
       }
     }
+    this.attachSocket()
     this.broadcastHello()
+  }
+
+  private profile() {
+    return { deviceId: this.myDeviceId, name: this.myName, publicKey: this.myPublicKey }
+  }
+
+  private attachSocket(): void {
+    this.socket = getSocket()
+    if (!this.socket) return
+    const register = () => {
+      this.socket?.emit("local:register", this.profile())
+      const peerIds = Array.from(this.pcs.keys()).filter((id) => id && !id.startsWith("pairing-") && !id.startsWith("pending:"))
+      this.socket?.emit("local:discover", { deviceId: this.myDeviceId, peerIds })
+    }
+    const onOffer = async ({ code, offer, peer }: { code: string; offer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => {
+      const answer = await this.acceptPairingOffer(code, offer)
+      this.socket?.emit("local:pair:answer", { code, answer, profile: this.profile() })
+      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
+    }
+    const onAnswer = async ({ code, answer, peer }: { code: string; answer: RTCSessionDescriptionInit; peer: { deviceId: string; name: string; publicKey: string } }) => {
+      await this.acceptPairingAnswer(code, answer)
+      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
+    }
+    const onOnline = ({ peer }: { peer: { deviceId: string; name: string; publicKey: string } }) => {
+      this.sink({ kind: "hello", deviceId: peer.deviceId, name: peer.name, publicKey: peer.publicKey }, peer.deviceId)
+    }
+    const onSignal = ({ fromDeviceId, payload }: { fromDeviceId: string; payload: WireMessage }) => this.sink(payload, fromDeviceId)
+    this.socketHandlers = [["connect", register], ["local:pair:offer", onOffer], ["local:pair:answer", onAnswer], ["local:peer:online", onOnline], ["local:signal", onSignal]]
+    this.socketHandlers.forEach(([event, handler]) => this.socket?.on(event, handler))
+    register()
+  }
+
+  async createPairingCode(): Promise<string> {
+    const { code, offer } = await this.createPairingOffer()
+    this.socket?.emit("local:pair:create", { code, offer, profile: this.profile() })
+    return code
+  }
+
+  joinPairingCode(code: string): void {
+    this.socket?.emit("local:pair:join", { code: code.trim().toUpperCase(), profile: this.profile() })
   }
 
   private broadcastHello(): void {
@@ -67,6 +112,10 @@ export class LocalTransport {
   send(peerId: string, msg: WireMessage): boolean {
     let sent = false
     this.channel?.postMessage(msg)
+    if (this.socket?.connected) {
+      this.socket.emit("local:signal", { targetDeviceId: peerId, payload: msg })
+      sent = true
+    }
     const dc = this.dataChannels.get(peerId)
     if (dc && dc.readyState === "open") {
       dc.send(JSON.stringify(msg))
@@ -213,6 +262,9 @@ export class LocalTransport {
   }
 
   dispose(): void {
+    this.socketHandlers.forEach(([event, handler]) => this.socket?.off(event, handler))
+    this.socketHandlers = []
+    this.socket = null
     this.channel?.close()
     this.pcs.forEach((pc) => pc.close())
     this.pcs.clear()

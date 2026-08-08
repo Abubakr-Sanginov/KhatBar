@@ -40,11 +40,11 @@ function LocalMessageBubble({ message }: { message: LocalMessage }) {
 }
 
 export default function LocalChatScreen({ route, navigation }: any) {
-  const { peerId, peerName } = route.params;
+  const { peerId, peerName, chatId } = route.params;
   const colors = useThemeColors();
   const styles = useThemedStyles(makeStyles);
   const { sendLocalMessage, messages, peers } = useLocalChat();
-  const chatMessages = messages[peerId] || [];
+  const chatMessages = messages[chatId] || [];
   const peer = peers[peerId];
   const [input, setInput] = useState("");
   const flatListRef = useRef<FlatList>(null);

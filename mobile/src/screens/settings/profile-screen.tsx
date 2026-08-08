@@ -8,8 +8,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, Pressable } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { useAuthStore } from "../../stores/auth-store";
 import { usersApi } from "../../api/users";
 import { useThemeColors, useThemedStyles } from "../../hooks/use-theme";
