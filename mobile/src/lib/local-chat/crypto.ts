@@ -146,7 +146,10 @@ async function sharedAesKey(peerPublicKey: string, peerId: string): Promise<any>
   const privateKey = await getStoredPrivateKey();
   const peer = await subtle.importKey("jwk", JSON.parse(peerPublicKey), ECDH, false, []);
   const shared = await subtle.deriveBits({ name: "ECDH", public: peer }, privateKey, 256);
-  const key = await subtle.importKey("raw", shared, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  // SecureStore cannot structured-clone CryptoKey objects, so persist this derived
+  // key as JWK. It must be extractable for that one export, unlike the ECDH private
+  // key which is imported non-extractable when used.
+  const key = await subtle.importKey("raw", shared, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
 
   const exported = await subtle.exportKey("jwk", key);
   await SecureStore.setItemAsync(SHARED_KEY_PREFIX + peerId, JSON.stringify(exported));

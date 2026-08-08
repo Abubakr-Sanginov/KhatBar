@@ -88,6 +88,10 @@ function generateId(): string {
   return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("")
 }
 
+function isCryptoKey(value: CryptoKey | JsonWebKey): value is CryptoKey {
+  return typeof CryptoKey !== "undefined" && value instanceof CryptoKey
+}
+
 export async function getOrCreateDeviceIdentity(): Promise<{
   deviceId: string
   name: string
@@ -99,43 +103,55 @@ export async function getOrCreateDeviceIdentity(): Promise<{
     deviceId = generateId()
     await putRecord(IDENTITY_STORE, DEVICE_ID_KEY, deviceId)
   }
-  const existing = await getRecord<{ name: string; publicKey: JsonWebKey; privateKey: JsonWebKey }>(
-    IDENTITY_STORE,
-    IDENTITY_KEY,
-  )
+  const existing = await getRecord<{
+    name: string
+    publicKey: JsonWebKey
+    privateKey: CryptoKey | JsonWebKey
+  }>(IDENTITY_STORE, IDENTITY_KEY)
   if (existing) {
-    const keyPair = await crypto.subtle.importKey(
-      "jwk",
-      existing.privateKey as JsonWebKey,
-      { name: "ECDH", namedCurve: "P-256" },
-      false,
-      ["deriveBits"],
-    )
-    return {
-      deviceId,
-      name: existing.name,
-      publicKey: existing.publicKey,
-      privateKey: keyPair,
+    try {
+      const privateKey = isCryptoKey(existing.privateKey)
+        ? existing.privateKey
+        : await crypto.subtle.importKey(
+            "jwk",
+            existing.privateKey,
+            { name: "ECDH", namedCurve: "P-256" },
+            false,
+            ["deriveBits"],
+          )
+      if (privateKey.type !== "private" || privateKey.algorithm.name !== "ECDH") {
+        throw new Error("Incompatible identity key")
+      }
+      return { deviceId, name: existing.name, publicKey: existing.publicKey, privateKey }
+    } catch {
+      // Older builds could persist an invalid/non-exportable identity. Regenerate it
+      // instead of leaving local chat permanently unable to start.
     }
   }
-  const keyPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"])
-  const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey as CryptoKey)
-  const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey as CryptoKey)
-  const name =
-    (typeof navigator !== "undefined" && navigator.language === "ru"
+  // Web Crypto applies extractability to both halves of a generated pair. Generate
+  // it exportable only long enough to serialize the public key and re-import the
+  // private key as non-extractable before it leaves this function. IndexedDB then
+  // persists that CryptoKey via structured clone, so later sessions need no export.
+  const generated = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"],
+  ) as CryptoKeyPair
+  const publicJwk = await crypto.subtle.exportKey("jwk", generated.publicKey)
+  const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey)
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    privateJwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    ["deriveBits"],
+  )
+  const name = existing?.name ??
+    ((typeof navigator !== "undefined" && navigator.language === "ru"
       ? "Локальное устройство"
-      : "Local device") + " " + deviceId.slice(0, 4).toUpperCase()
-  await putRecord(IDENTITY_STORE, IDENTITY_KEY, {
-    name,
-    publicKey: publicJwk as JsonWebKey,
-    privateKey: privateJwk as JsonWebKey,
-  })
-  return {
-    deviceId,
-    name,
-    publicKey: publicJwk as JsonWebKey,
-    privateKey: keyPair.privateKey,
-  }
+      : "Local device") + " " + deviceId.slice(0, 4).toUpperCase())
+  await putRecord(IDENTITY_STORE, IDENTITY_KEY, { name, publicKey: publicJwk, privateKey })
+  return { deviceId, name, publicKey: publicJwk, privateKey }
 }
 
 /** Derive (or fetch cached) shared secret with a peer. */
@@ -145,15 +161,18 @@ async function getSharedSecret(
   peerId: string,
 ): Promise<CryptoKey> {
   const cacheKey = SHARED_PREFIX + peerId
-  const cached = await getRecord<JsonWebKey>(SHARED_STORE, cacheKey)
+  const cached = await getRecord<CryptoKey | JsonWebKey>(SHARED_STORE, cacheKey)
   if (cached) {
-    return crypto.subtle.importKey(
+    if (isCryptoKey(cached)) return cached
+    const migrated = await crypto.subtle.importKey(
       "jwk",
       cached,
       { name: "AES-GCM", length: 256 },
       false,
       ["encrypt", "decrypt"],
     )
+    await putRecord(SHARED_STORE, cacheKey, migrated)
+    return migrated
   }
   const publicJwk = typeof peerPublicKeyJwk === "string" ? (JSON.parse(peerPublicKeyJwk) as JsonWebKey) : peerPublicKeyJwk
   const peerPublicKey = await crypto.subtle.importKey(
@@ -168,12 +187,11 @@ async function getSharedSecret(
     "raw",
     bits,
     { name: "AES-GCM", length: 256 },
-    true,
+    false,
     ["encrypt", "decrypt"],
   )
-  const jwk = await crypto.subtle.exportKey("jwk", raw as CryptoKey)
-  await putRecord(SHARED_STORE, cacheKey, jwk as JsonWebKey)
-  return raw as CryptoKey
+  await putRecord(SHARED_STORE, cacheKey, raw)
+  return raw
 }
 
 function toB64(buf: ArrayBuffer): string {
