@@ -14,8 +14,24 @@ try {
 }
 
 const DEVICE_ID_KEY = "khatbar_local_device_id";
-const IDENTITY_KEY = "khatbar_local_identity";
-const SHARED_KEY_PREFIX = "khatbar_local_shared_";
+const IDENTITY_KEY = "khatbar_local_identity_v2";
+const LEGACY_IDENTITY_KEY = "khatbar_local_identity";
+const STORAGE_VERSION_KEY = "khatbar_local_key_storage_version";
+const KEY_STORAGE_VERSION = "2";
+const SHARED_KEY_PREFIX = "khatbar_local_shared_v2_";
+
+function cryptoError(operation: string, cause: unknown): Error {
+  const detail = cause instanceof Error ? cause.message : String(cause);
+  return new Error(`[mobile local-chat crypto:${operation}] ${detail}`, { cause });
+}
+
+async function cryptoOperation<T>(operation: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (cause) {
+    throw cryptoError(operation, cause);
+  }
+}
 
 const ECDH = { name: "ECDH", namedCurve: "P-256" } as const;
 
@@ -110,21 +126,50 @@ function generateDeviceName(): string {
 }
 
 export async function getOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
-  const existingId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
-  const existingIdentity = await SecureStore.getItemAsync(IDENTITY_KEY);
+  const [existingId, existingIdentity, storageVersion] = await Promise.all([
+    SecureStore.getItemAsync(DEVICE_ID_KEY),
+    SecureStore.getItemAsync(IDENTITY_KEY),
+    SecureStore.getItemAsync(STORAGE_VERSION_KEY),
+  ]);
 
-  if (existingId && existingIdentity) {
-    return { deviceId: existingId, ...JSON.parse(existingIdentity) };
+  if (storageVersion !== KEY_STORAGE_VERSION) {
+    // Legacy identity/shared JWKs are intentionally not reused across the storage
+    // boundary. SecureStore has no prefix enumeration, so versioned names make old
+    // records unreachable and safe to remove opportunistically.
+    await Promise.all([
+      SecureStore.deleteItemAsync(LEGACY_IDENTITY_KEY),
+      SecureStore.setItemAsync(STORAGE_VERSION_KEY, KEY_STORAGE_VERSION),
+    ]);
   }
 
-  const deviceId = randomHex(16);
+  if (existingId && existingIdentity) {
+    try {
+      const parsed = JSON.parse(existingIdentity);
+      if (parsed?.name && parsed?.publicKey && parsed?.privateKey) {
+        return { deviceId: existingId, name: parsed.name, publicKey: parsed.publicKey };
+      }
+    } catch {
+      await SecureStore.deleteItemAsync(IDENTITY_KEY);
+    }
+  }
+
+  const deviceId = existingId ?? randomHex(16);
   const name = generateDeviceName();
 
-  const pair = await subtle.generateKey(ECDH, true, ["deriveBits", "deriveKey"]);
+  // SecureStore cannot persist CryptoKey objects. This mobile-only boundary uses
+  // a temporary extractable pair to serialize JWKs, then imports the private JWK
+  // non-extractable whenever it is used.
+  const pair = await cryptoOperation("identity.generate-mobile-jwk", () =>
+    subtle.generateKey(ECDH, true, ["deriveBits", "deriveKey"]),
+  );
   if (!("privateKey" in pair)) throw new Error("Could not generate key pair");
 
-  const publicKey = JSON.stringify(await subtle.exportKey("jwk", pair.publicKey as any));
-  const privateKey = JSON.stringify(await subtle.exportKey("jwk", pair.privateKey as any));
+  const publicKey = JSON.stringify(await cryptoOperation("identity.export-public-mobile-jwk", () =>
+    subtle.exportKey("jwk", pair.publicKey as any),
+  ));
+  const privateKey = JSON.stringify(await cryptoOperation("identity.export-temporary-private-mobile-jwk", () =>
+    subtle.exportKey("jwk", pair.privateKey as any),
+  ));
 
   await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId);
   await SecureStore.setItemAsync(IDENTITY_KEY, JSON.stringify({ name, publicKey, privateKey }));
@@ -136,22 +181,33 @@ export async function getStoredPrivateKey(): Promise<any> {
   const raw = await SecureStore.getItemAsync(IDENTITY_KEY);
   if (!raw) throw new Error("No identity key");
   const { privateKey } = JSON.parse(raw);
-  return subtle.importKey("jwk", privateKey, ECDH, false, ["deriveBits", "deriveKey"]);
+  return cryptoOperation("identity.import-private-nonextractable", () =>
+    subtle.importKey("jwk", privateKey, ECDH, false, ["deriveBits", "deriveKey"]),
+  );
 }
 
 async function sharedAesKey(peerPublicKey: string, peerId: string): Promise<any> {
   const cached = await SecureStore.getItemAsync(SHARED_KEY_PREFIX + peerId);
-  if (cached) return subtle.importKey("jwk", JSON.parse(cached), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  if (cached) return cryptoOperation("shared.import-cached", () =>
+    subtle.importKey("jwk", JSON.parse(cached), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]),
+  );
 
   const privateKey = await getStoredPrivateKey();
-  const peer = await subtle.importKey("jwk", JSON.parse(peerPublicKey), ECDH, false, []);
-  const shared = await subtle.deriveBits({ name: "ECDH", public: peer }, privateKey, 256);
-  // SecureStore cannot structured-clone CryptoKey objects, so persist this derived
-  // key as JWK. It must be extractable for that one export, unlike the ECDH private
-  // key which is imported non-extractable when used.
-  const key = await subtle.importKey("raw", shared, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
+  const peer = await cryptoOperation("shared.import-peer-public", () =>
+    subtle.importKey("jwk", JSON.parse(peerPublicKey), ECDH, false, []),
+  );
+  const shared = await cryptoOperation("shared.derive-bits", () =>
+    subtle.deriveBits({ name: "ECDH", public: peer }, privateKey, 256),
+  );
+  // SecureStore cannot structured-clone CryptoKey objects, so this mobile-only
+  // temporary AES key is extractable solely for immediate JWK serialization.
+  const key = await cryptoOperation("shared.import-temporary-extractable", () =>
+    subtle.importKey("raw", shared, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]),
+  );
 
-  const exported = await subtle.exportKey("jwk", key);
+  const exported = await cryptoOperation("shared.export-temporary-mobile-jwk", () =>
+    subtle.exportKey("jwk", key),
+  );
   await SecureStore.setItemAsync(SHARED_KEY_PREFIX + peerId, JSON.stringify(exported));
 
   return key;

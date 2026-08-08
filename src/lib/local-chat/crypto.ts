@@ -9,13 +9,30 @@
 const idb = () => globalThis.indexedDB as IDBFactory | undefined
 
 const KEY_DB_NAME = "khatbar-local-keys"
-// bumped so pre-existing DBs from earlier builds get the missing stores
-const KEY_DB_VERSION = 2
+const KEY_DB_VERSION = 3
+const KEY_STORAGE_VERSION = 3
 
 const IDENTITY_STORE = "keys"
 const SHARED_STORE = "shared"
 
 const REQUIRED_STORES = [IDENTITY_STORE, SHARED_STORE]
+const DEVICE_ID_KEY = "deviceId"
+const IDENTITY_KEY = "identity"
+const STORAGE_VERSION_KEY = "storageVersion"
+const SHARED_PREFIX = "shared:"
+
+function cryptoError(operation: string, cause: unknown): Error {
+  const detail = cause instanceof Error ? cause.message : String(cause)
+  return new Error(`[local-chat crypto:${operation}] ${detail}`, { cause })
+}
+
+async function cryptoOperation<T>(operation: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (cause) {
+    throw cryptoError(operation, cause)
+  }
+}
 
 function dropDatabase(name: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -78,9 +95,30 @@ async function putRecord(storeName: string, key: string, value: unknown): Promis
   }
 }
 
-const DEVICE_ID_KEY = "deviceId"
-const IDENTITY_KEY = "identity"
-const SHARED_PREFIX = "shared:"
+async function clearStore(storeName: string): Promise<void> {
+  const db = await openKeyDb()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readwrite")
+      tx.objectStore(storeName).clear()
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+async function migrateKeyStorage(): Promise<void> {
+  const version = await getRecord<number>(IDENTITY_STORE, STORAGE_VERSION_KEY)
+  if (version === KEY_STORAGE_VERSION) return
+  // Old records may contain extractable JWKs or CryptoKeys with incompatible
+  // usages. Keep the stable device id/name, but rotate identity and shared keys.
+  const existing = await getRecord<{ name?: string }>(IDENTITY_STORE, IDENTITY_KEY)
+  await clearStore(SHARED_STORE)
+  await putRecord(IDENTITY_STORE, IDENTITY_KEY, existing?.name ? { name: existing.name } : null)
+  await putRecord(IDENTITY_STORE, STORAGE_VERSION_KEY, KEY_STORAGE_VERSION)
+}
 
 function generateId(): string {
   const arr = new Uint8Array(16)
@@ -98,17 +136,18 @@ export async function getOrCreateDeviceIdentity(): Promise<{
   publicKey: JsonWebKey
   privateKey: CryptoKey
 }> {
+  await migrateKeyStorage()
   let deviceId = await getRecord<string>(IDENTITY_STORE, DEVICE_ID_KEY)
   if (!deviceId) {
     deviceId = generateId()
     await putRecord(IDENTITY_STORE, DEVICE_ID_KEY, deviceId)
   }
   const existing = await getRecord<{
-    name: string
-    publicKey: JsonWebKey
-    privateKey: CryptoKey | JsonWebKey
+    name?: string
+    publicKey?: JsonWebKey
+    privateKey?: CryptoKey | JsonWebKey
   }>(IDENTITY_STORE, IDENTITY_KEY)
-  if (existing) {
+  if (existing?.publicKey && existing.privateKey) {
     try {
       const privateKey = isCryptoKey(existing.privateKey)
         ? existing.privateKey
@@ -122,30 +161,23 @@ export async function getOrCreateDeviceIdentity(): Promise<{
       if (privateKey.type !== "private" || privateKey.algorithm.name !== "ECDH") {
         throw new Error("Incompatible identity key")
       }
-      return { deviceId, name: existing.name, publicKey: existing.publicKey, privateKey }
+      return { deviceId, name: existing.name ?? "Local device", publicKey: existing.publicKey, privateKey }
     } catch {
       // Older builds could persist an invalid/non-exportable identity. Regenerate it
       // instead of leaving local chat permanently unable to start.
     }
   }
-  // Web Crypto applies extractability to both halves of a generated pair. Generate
-  // it exportable only long enough to serialize the public key and re-import the
-  // private key as non-extractable before it leaves this function. IndexedDB then
-  // persists that CryptoKey via structured clone, so later sessions need no export.
-  const generated = await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    true,
-    ["deriveBits"],
-  ) as CryptoKeyPair
-  const publicJwk = await crypto.subtle.exportKey("jwk", generated.publicKey)
-  const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey)
-  const privateKey = await crypto.subtle.importKey(
-    "jwk",
-    privateJwk,
+  // Web Crypto permits exporting a public key from a non-extractable key pair.
+  // Persist the generated private CryptoKey directly; it is never exported.
+  const generated = await cryptoOperation("identity.generate", () => crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
     false,
     ["deriveBits"],
+  )) as CryptoKeyPair
+  const publicJwk = await cryptoOperation("identity.export-public", () =>
+    crypto.subtle.exportKey("jwk", generated.publicKey),
   )
+  const privateKey = generated.privateKey
   const name = existing?.name ??
     ((typeof navigator !== "undefined" && navigator.language === "ru"
       ? "Локальное устройство"
@@ -164,32 +196,34 @@ async function getSharedSecret(
   const cached = await getRecord<CryptoKey | JsonWebKey>(SHARED_STORE, cacheKey)
   if (cached) {
     if (isCryptoKey(cached)) return cached
-    const migrated = await crypto.subtle.importKey(
+    const migrated = await cryptoOperation("shared.import-legacy", () => crypto.subtle.importKey(
       "jwk",
       cached,
       { name: "AES-GCM", length: 256 },
       false,
       ["encrypt", "decrypt"],
-    )
+    ))
     await putRecord(SHARED_STORE, cacheKey, migrated)
     return migrated
   }
   const publicJwk = typeof peerPublicKeyJwk === "string" ? (JSON.parse(peerPublicKeyJwk) as JsonWebKey) : peerPublicKeyJwk
-  const peerPublicKey = await crypto.subtle.importKey(
+  const peerPublicKey = await cryptoOperation("shared.import-peer-public", () => crypto.subtle.importKey(
     "jwk",
     publicJwk,
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
+  ))
+  const bits = await cryptoOperation("shared.derive-bits", () =>
+    crypto.subtle.deriveBits({ name: "ECDH", public: peerPublicKey }, myPrivateKey, 256),
   )
-  const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: peerPublicKey }, myPrivateKey, 256)
-  const raw = await crypto.subtle.importKey(
+  const raw = await cryptoOperation("shared.import-aes", () => crypto.subtle.importKey(
     "raw",
     bits,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
-  )
+  ))
   await putRecord(SHARED_STORE, cacheKey, raw)
   return raw
 }
