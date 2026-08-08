@@ -9,6 +9,8 @@ interface ChatStore {
   setChats: (chats: Chat[]) => void
   setActiveChat: (chat: Chat | null) => void
   addMessage: (chatId: string, message: Message) => void
+  removeMessage: (chatId: string, messageId: string) => void
+  redactMessage: (chatId: string, messageId: string) => void
   setMessages: (chatId: string, messages: Message[]) => void
   prependMessages: (chatId: string, messages: Message[]) => void
   touchChat: (chatId: string, message: Message) => void
@@ -44,6 +46,22 @@ export const useChatStore = create<ChatStore>((set) => ({
         },
       }
     }),
+  removeMessage: (chatId, messageId) =>
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [chatId]: (state.messages[chatId] || []).filter((message) => message.id !== messageId),
+      },
+    })),
+  redactMessage: (chatId, messageId) =>
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [chatId]: (state.messages[chatId] || []).map((message) =>
+          message.id === messageId ? { ...message, content: null, mediaUrl: null } : message,
+        ),
+      },
+    })),
   touchChat: (chatId, message) =>
     set((state) => ({
       chats: state.chats
@@ -59,16 +77,33 @@ export const useChatStore = create<ChatStore>((set) => ({
         .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()),
     })),
   setMessages: (chatId, messages) =>
-    set((state) => ({
-      messages: { ...state.messages, [chatId]: messages },
-    })),
+    set((state) => {
+      const merged = new Map<string, Message>()
+      for (const message of state.messages[chatId] || []) merged.set(message.id, message)
+      for (const message of messages) merged.set(message.id, message)
+      return {
+        messages: {
+          ...state.messages,
+          [chatId]: [...merged.values()].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          ),
+        },
+      }
+    }),
   prependMessages: (chatId, messages) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [chatId]: [...messages, ...(state.messages[chatId] || [])],
-      },
-    })),
+    set((state) => {
+      const merged = new Map<string, Message>()
+      for (const message of messages) merged.set(message.id, message)
+      for (const message of state.messages[chatId] || []) merged.set(message.id, message)
+      return {
+        messages: {
+          ...state.messages,
+          [chatId]: [...merged.values()].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          ),
+        },
+      }
+    }),
   updateMemberStatus: (userId, status) =>
     set((state) => ({
       chats: state.chats.map((chat) => ({

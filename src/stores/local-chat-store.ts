@@ -2,8 +2,12 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { LocalChat, LocalMessage, LocalPeer } from "@/lib/local-chat/types"
 
+export type LocalEngineStatus = "idle" | "starting" | "ready" | "error"
+
 interface LocalChatState {
   ready: boolean
+  status: LocalEngineStatus
+  error: string | null
   deviceId: string | null
   peers: Record<string, LocalPeer>
   chats: LocalChat[]
@@ -12,6 +16,7 @@ interface LocalChatState {
   pairingCode: string | null
 
   setReady: (ready: boolean) => void
+  setStatus: (status: LocalEngineStatus, error?: string | null) => void
   setDeviceId: (id: string | null) => void
   upsertPeer: (peer: LocalPeer) => void
   setPeerOnline: (id: string, online: boolean) => void
@@ -27,6 +32,8 @@ export const useLocalChatStore = create<LocalChatState>()(
   persist(
     (set) => ({
       ready: false,
+      status: "idle",
+      error: null,
       deviceId: null,
       peers: {},
       chats: [],
@@ -34,7 +41,8 @@ export const useLocalChatStore = create<LocalChatState>()(
       activeChatId: null,
       pairingCode: null,
 
-      setReady: (ready) => set({ ready }),
+      setReady: (ready) => set({ ready, status: ready ? "ready" : "idle", error: null }),
+      setStatus: (status, error = null) => set({ status, error, ready: status === "ready" }),
       setDeviceId: (deviceId) => set({ deviceId }),
       upsertPeer: (peer) =>
         set((s) => {

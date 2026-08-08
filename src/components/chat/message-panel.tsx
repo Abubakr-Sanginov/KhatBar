@@ -176,7 +176,7 @@ function MessageBubble({
 }
 
 export function MessagePanel() {
-  const { activeChat, chats, messages, setMessages, prependMessages, addMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
+  const { activeChat, chats, messages, setMessages, prependMessages, addMessage, removeMessage, redactMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread } = useChatStore()
   const { toggleInfoPanel } = useUIStore()
   const { user, encryptionReady } = useAuth()
   const { isConnected, emit, on } = useSocket()
@@ -190,6 +190,7 @@ export function MessagePanel() {
   const [reportSending, setReportSending] = useState(false)
   const [reportSent, setReportSent] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deletingIds, setDeletingIds] = useState<string[]>([])
   const lastSelectedIndexRef = useRef<number | null>(null)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -255,28 +256,14 @@ export function MessagePanel() {
     })
     const offDeleted = on("message:deleted", (data) => {
       const d = data as { chatId: string; messageId: string }
-      if (d.chatId === chatId) {
-        useChatStore.setState((state) => ({
-          messages: {
-            ...state.messages,
-            [d.chatId]: (state.messages[d.chatId] || []).map((m) =>
-              m.id === d.messageId ? { ...m, content: null, mediaUrl: null } : m,
-            ),
-          },
-        }))
-      }
+      redactMessage(d.chatId, d.messageId)
+      setDeletingIds((prev) => prev.filter((id) => id !== d.messageId))
     })
     const offDeletedHard = on("message:deleted-hard", (data) => {
       const d = data as { chatId: string; messageId: string }
-      if (d.chatId === chatId) {
-        setSelectedIds((prev) => prev.filter((id) => id !== d.messageId))
-        useChatStore.setState((state) => ({
-          messages: {
-            ...state.messages,
-            [d.chatId]: (state.messages[d.chatId] || []).filter((m) => m.id !== d.messageId),
-          },
-        }))
-      }
+      setSelectedIds((prev) => prev.filter((id) => id !== d.messageId))
+      setDeletingIds((prev) => prev.filter((id) => id !== d.messageId))
+      removeMessage(d.chatId, d.messageId)
     })
     const offTyping = on("typing", (data) => {
       const d = data as { chatId: string; userId: string; isTyping: boolean }
@@ -308,7 +295,7 @@ export function MessagePanel() {
       offPresence()
       offRead()
     }
-  }, [chatId, chats, activeChat, on, addMessage, touchChat, incrementUnread, setMessages, updateMemberStatus, updateMemberLastRead, resetUnread, user?.id])
+  }, [chatId, chats, activeChat, on, addMessage, removeMessage, redactMessage, touchChat, incrementUnread, updateMemberStatus, updateMemberLastRead, resetUnread, user?.id])
 
   if (!activeChat) {
     return (
@@ -337,12 +324,29 @@ export function MessagePanel() {
   const memberCount = activeChat.memberCount ?? activeChat.members.length
   const canPost = canPostToChat(activeChat, user?.id)
 
-  function handleDelete(msgId: string) {
-    if (!activeChat) return
-    const msg = chatMessages.find((m) => m.id === msgId)
-    const hard = msg ? msg.content === null && !msg.mediaUrl : false
+  async function handleDelete(msgId: string) {
+    if (!activeChat || deletingIds.includes(msgId)) return
+    const msg = chatMessages.find((message) => message.id === msgId)
+    if (!msg || msg.senderId !== user?.id) return
+    const hard = msg.content === null && !msg.mediaUrl
     if (hard && !confirm("Delete this message permanently?")) return
-    emit("message:delete", { chatId: activeChat.id, messageId: msgId, hard })
+    setDeletingIds((prev) => [...prev, msgId])
+    try {
+      const response = await fetch(
+        `/api/messages/${encodeURIComponent(msgId)}?chatId=${encodeURIComponent(activeChat.id)}&hard=${hard}`,
+        { method: "DELETE" },
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { error?: string }
+        throw new Error(data.error || "Could not delete message")
+      }
+      if (hard) removeMessage(activeChat.id, msgId)
+      else redactMessage(activeChat.id, msgId)
+    } catch (cause) {
+      console.error(cause instanceof Error ? cause.message : "Could not delete message")
+    } finally {
+      setDeletingIds((prev) => prev.filter((id) => id !== msgId))
+    }
   }
 
   function toggleSelect(id: string) {

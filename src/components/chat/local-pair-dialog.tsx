@@ -21,22 +21,27 @@ export function LocalPairDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { ready, peers, chats, deviceId } = useLocalChatStore()
-  const { pair } = useLocalChat()
+  const { ready, status, error, peers, chats, deviceId } = useLocalChatStore()
+  const { pair, retry } = useLocalChat()
   const [code, setCode] = useState("")
   const [pairingPeer, setPairingPeer] = useState<LocalPeer | null>(null)
-  const [pairingState, setPairingState] = useState<"idle" | "waiting" | "done">("idle")
+  const [pairingState, setPairingState] = useState<"idle" | "waiting" | "done" | "error">("idle")
+  const [pairingError, setPairingError] = useState<string | null>(null)
 
   const pairedIds = new Set(chats.map((c) => c.peerId))
   const discoverable = Object.values(peers).filter((p) => p.id !== deviceId && !pairedIds.has(p.id))
 
-  function pairPeer(peer: LocalPeer) {
+  async function pairPeer(peer: LocalPeer) {
     setPairingPeer(peer)
     setPairingState("waiting")
-    setTimeout(async () => {
+    setPairingError(null)
+    try {
       await pair(peer)
       setPairingState("done")
-    }, 400)
+    } catch (cause) {
+      setPairingState("error")
+      setPairingError(cause instanceof Error ? cause.message : "Pairing failed")
+    }
   }
 
   function openChange(next: boolean) {
@@ -44,6 +49,7 @@ export function LocalPairDialog({
       setCode("")
       setPairingState("idle")
       setPairingPeer(null)
+      setPairingError(null)
     }
     onOpenChange(next)
   }
@@ -60,11 +66,20 @@ export function LocalPairDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {!ready && (
+        {(status === "idle" || status === "starting") && (
           <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Starting local engine…
           </div>
         )}
+
+        {status === "error" && (
+          <div className="space-y-3 py-4 text-sm">
+            <p className="text-destructive">{error || "Local engine failed to start"}</p>
+            <Button variant="secondary" onClick={() => void retry().catch(() => {})}>Retry</Button>
+          </div>
+        )}
+
+        {pairingError && <p className="text-sm text-destructive">{pairingError}</p>}
 
         {ready && discoverable.length === 0 && (
           <p className="py-4 text-center text-sm text-muted-foreground">
@@ -91,7 +106,7 @@ export function LocalPairDialog({
                     size="sm"
                     variant="secondary"
                     disabled={pairingState === "waiting" || pairingState === "done"}
-                    onClick={() => pairPeer(peer)}
+                    onClick={() => void pairPeer(peer)}
                   >
                     {pairingState === "done" && pairingPeer?.id === peer.id ? (
                       <Check className="h-3.5 w-3.5" />
@@ -118,7 +133,7 @@ export function LocalPairDialog({
             disabled={code.length < 6}
             onClick={() => {
               const peer = Object.values(peers).find((p) => p.name.includes(code.slice(0, 4)))
-              if (peer) pairPeer(peer)
+              if (peer) void pairPeer(peer)
             }}
           >
             Connect
